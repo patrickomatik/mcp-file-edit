@@ -1,0 +1,17 @@
+[project]
+name = "mcp-file-editor"
+version = "1.0.0"
+description = "A Model Context Protocol server for comprehensive file system operations"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "MCP File Editor Contributors", email = ""}
+]
+dependencies = [
+    "mcp[cli]>=1.6.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/yourusername/mcp-file-editor"
+"Bug Tracker" = "https://github.com/yourusername/mcp-file-editor/issues"
