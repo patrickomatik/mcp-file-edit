@@ -236,9 +236,10 @@ results = search_functions("test_.*", "tests/", "*.py")
 ### Project Management
 - `set_project_directory` - Set the working directory context
 - `get_project_directory` - Get current project directory
-### Code Analysis- `list_functions` - List all functions in a code file with signatures and line numbers- `get_function_at_line` - Find which function contains a specific line- `get_code_structure` - Extract complete code structure (imports, classes, functions)- `search_functions` - Search for functions by name pattern across files
-## Safety Features
 
+### Code Analysis- `list_functions` - List all functions in a code file with signatures and line numbers- `get_function_at_line` - Find which function contains a specific line- `get_code_structure` - Extract complete code structure (imports, classes, functions)- `search_functions` - Search for functions by name pattern across files
+
+## Safety Features
 - **Path Traversal Protection**: All paths are validated to prevent directory traversal attacks
 - **Project Boundary Enforcement**: Operations are restricted to the base directory
 - **Backup Creation**: Automatic backups before modifications (configurable)
@@ -246,7 +247,6 @@ results = search_functions("test_.*", "tests/", "*.py")
 - **Atomic Operations**: All-or-nothing patch applications
 
 ## Examples
-
 See the `examples/` directory for detailed usage examples:
 - `example_usage.py` - Basic file operations
 - `enhanced_features_examples.py` - Advanced search and depth control
@@ -301,7 +301,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Built with [FastMCP](https://github.com/jlowin/fastmcp) framework
 - Implements the [Model Context Protocol](https://modelcontextprotocol.io) specification
-- Inspired by the need for safe, powerful file system access for LLMs
 
 ## Support
 
