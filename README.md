@@ -1,260 +1,237 @@
-# MCP File Editor
+# MCP File Edit
 
-A Model Context Protocol (MCP) server built with FastMCP that provides comprehensive file system operations.
+A powerful Model Context Protocol (MCP) server that provides comprehensive file system operations. Built with FastMCP, this server enables LLMs to safely interact with your file system through a wide range of operations.
 
 ## Features
 
-- **File Operations**: Read, write, create, delete, move, and copy files
-- **Directory Operations**: List files, create directories, recursive operations
-- **Search**: Search for patterns in files using regex
-- **Replace**: Find and replace text across multiple files
-- **Patch**: Apply precise modifications to files with line, pattern, or context-based patches
-- **Project Directory**: Set a working directory context for simplified relative paths
-- **File Information**: Get detailed metadata about files and directories
-- **Safety**: Built-in path traversal protection
-- **Binary Support**: Handle both text and binary files
+- 📁 **File Operations**: Read, write, create, delete, move, and copy files
+- 📂 **Directory Management**: List files, create directories, recursive operations  
+- 🔍 **Search**: Search for patterns in files using regex with depth control
+- 🔄 **Replace**: Find and replace text across multiple files
+- 🔧 **Patch**: Apply precise modifications using line, pattern, or context-based patches
+- 📍 **Project Directory**: Set a working directory for simplified relative paths
+- 🛡️ **Safety**: Built-in path traversal protection and safe operations
+- 💾 **Binary Support**: Handle both text and binary files with proper encoding
 
 ## Installation
 
+### Using uv (recommended)
+
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/mcp-file-editor.git
-cd mcp-file-editor
-
-# Install dependencies using uv (recommended)
+git clone https://github.com/patrickomatik/mcp-file-edit.git
+cd mcp-file-edit
 uv pip install -e .
+```
 
-# Or using pip
+### Using pip
+
+```bash
+git clone https://github.com/patrickomatik/mcp-file-edit.git
+cd mcp-file-edit
 pip install -e .
 ```
 
-## Usage
+## Quick Start
 
-### Project Directory (Important!)
-
-**When using this MCP server, always set the project directory first!** This establishes a working context and allows you to use simple relative paths instead of full absolute paths.
-
-```python
-# First, set your project directory
-set_project_directory("/path/to/your/project")
-# or relative to current directory
-set_project_directory("my-project")
-
-# Check current project directory
-get_project_directory()
-
-# Now use relative paths for all operations
-read_file("src/main.py")              # Reads from project/src/main.py
-list_files("tests")                   # Lists files in project/tests
-create_file("docs/notes.md")          # Creates project/docs/notes.md
-```
-
-### Running the server
-
-```bash
-# Using uv
-uv run mcp run server.py
-
-# Or directly with Python
-python server.py
-```
-
-### Integration with Claude Desktop
+### 1. Configure Claude Desktop
 
 Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
-    "file-editor": {
-      "command": "/path/to/your/python",
-      "args": ["/path/to/mcp_file_editor/server.py"]
+    "file-edit": {
+      "command": "uv",
+      "args": ["run", "mcp", "run", "/path/to/mcp-file-edit/server.py"]
     }
   }
 }
 ```
 
-Or if using uv:
+Or with Python directly:
 
 ```json
 {
   "mcpServers": {
-    "file-editor": {
-      "command": "uv",
-      "args": ["run", "mcp", "run", "/path/to/mcp_file_editor/server.py"]
+    "file-edit": {
+      "command": "/path/to/python",
+      "args": ["/path/to/mcp-file-edit/server.py"]
     }
   }
 }
 ```
 
+### 2. Restart Claude Desktop
+
+After updating the configuration, restart Claude Desktop to load the MCP server.
+
+## Usage Guide
+
+### Project Directory (Recommended)
+
+Always set a project directory first to use relative paths:
+
+```python
+# Set project directory
+set_project_directory("/path/to/your/project")
+
+# Now use simple relative paths
+read_file("src/main.py")              # Reads from project/src/main.py
+write_file("docs/README.md", content) # Writes to project/docs/README.md
+list_files("tests")                   # Lists files in project/tests
+```
+
+### Basic File Operations
+
+```python
+# Read a file
+content = read_file("example.txt")
+
+# Write a file
+write_file("output.txt", "Hello, World!")
+
+# Create a new file
+create_file("new_file.py", "# New Python file")
+
+# Delete a file
+delete_file("old_file.txt")
+
+# Move/rename a file
+move_file("old_name.txt", "new_name.txt")
+
+# Copy a file
+copy_file("source.txt", "destination.txt")
+```
+
+### Search and Replace
+
+```python
+# Search for patterns
+results = search_files(
+    pattern="TODO|FIXME",
+    path="src",
+    recursive=True,
+    max_depth=3
+)
+
+# Replace across files
+replace_in_files(
+    search="old_function",
+    replace="new_function",
+    path=".",
+    file_pattern="*.py"
+)
+```
+
+### Advanced Patching
+
+```python
+# Line-based patch
+patch_file("config.json", patches=[
+    {"line": 5, "content": '    "debug": true,'}
+])
+
+# Pattern-based patch
+patch_file("main.py", patches=[
+    {"find": "import old", "replace": "import new"}
+])
+
+# Context-based patch (safer)
+patch_file("app.py", patches=[{
+    "context": ["def process():", "    return None"],
+    "replace": ["def process():", "    return result"]
+}])
+```
+
 ## Available Tools
-### set_project_directorySet the project directory for all subsequent file operations. This allows using relative paths instead of absolute paths.**Parameters:**- `path` (str): Path to the project directory (absolute or relative to current directory)**Returns:**Dictionary containing:- `project_directory`: The active project directory path- `relative_to_base`: Path relative to the base directory- `absolute_path`: Absolute path of the project directory### get_project_directoryGet the current project directory setting.**Parameters:**None**Returns:**Dictionary containing current project directory information, or a message if not set.
-### list_files
-List files and directories with optional filtering and depth control.
 
-**Parameters:**
-- `path` (str, optional): Directory path (default: current directory)
-- `pattern` (str, optional): Glob pattern for filtering (default: \"*\")
-- `recursive` (bool, optional): List recursively (default: False)
-- `include_hidden` (bool, optional): Include hidden files (default: False)
-- `max_depth` (int, optional): Maximum depth for recursive listing (default: None for unlimited)
+### File Operations
+- `read_file` - Read file contents with optional line range
+- `write_file` - Write content to a file  
+- `create_file` - Create a new file
+- `delete_file` - Delete a file or directory
+- `move_file` - Move or rename files
+- `copy_file` - Copy files or directories
 
-### read_file
-Read the contents of a file.
+### Directory Operations
+- `list_files` - List files with glob patterns and depth control
+- `get_file_info` - Get detailed file metadata
 
-**Parameters:**
-- `path` (str): File path
-- `encoding` (str, optional): File encoding (default: "utf-8")
-- `start_line` (int, optional): Starting line number (1-based)
-- `end_line` (int, optional): Ending line number (inclusive)
+### Search and Modification
+- `search_files` - Search for patterns with regex support
+- `replace_in_files` - Find and replace across multiple files
+- `patch_file` - Apply precise modifications to files
 
-### write_file
-Write content to a file.
+### Project Management
+- `set_project_directory` - Set the working directory context
+- `get_project_directory` - Get current project directory
 
-**Parameters:**
-- `path` (str): File path
-- `content` (str): Content to write
-- `encoding` (str, optional): File encoding (default: "utf-8", or "base64" for binary)
-- `create_dirs` (bool, optional): Create parent directories if needed (default: False)
+## Safety Features
 
-### create_file
-Create a new file with optional initial content.
+- **Path Traversal Protection**: All paths are validated to prevent directory traversal attacks
+- **Project Boundary Enforcement**: Operations are restricted to the base directory
+- **Backup Creation**: Automatic backups before modifications (configurable)
+- **Dry Run Mode**: Preview changes before applying them
+- **Atomic Operations**: All-or-nothing patch applications
 
-**Parameters:**
-- `path` (str): File path
-- `content` (str, optional): Initial content (default: "")
-- `create_dirs` (bool, optional): Create parent directories if needed (default: False)
+## Examples
 
-### delete_file
-Delete a file or directory.
-
-**Parameters:**
-- `path` (str): File or directory path
-- `recursive` (bool, optional): Delete directories recursively (default: False)
-
-### move_file
-Move or rename a file.
-
-**Parameters:**
-- `source` (str): Source path
-- `destination` (str): Destination path
-- `overwrite` (bool, optional): Overwrite if exists (default: False)
-
-### copy_file
-Copy a file or directory.
-
-**Parameters:**
-- `source` (str): Source path
-- `destination` (str): Destination path
-- `overwrite` (bool, optional): Overwrite if exists (default: False)
-
-### search_files
-Search for patterns in files with timeout and depth control.
-
-**Parameters:**
-- `pattern` (str): Search pattern (regex)
-- `path` (str, optional): Directory to search in (default: \".\")
-- `file_pattern` (str, optional): File name pattern (default: \"*\")
-- `recursive` (bool, optional): Search recursively (default: True)
-- `max_depth` (int, optional): Maximum depth for recursive search (default: None for unlimited)
-- `timeout` (float, optional): Maximum time in seconds for search operation (default: 30.0)
-
-**Returns:**
-Dictionary containing:
-- `results`: List of files with matches
-- `completed`: Whether search completed fully
-- `files_searched`: Number of files searched
-- `timeout_occurred`: Whether search timed out
-- `error`: Any error message
-
-### replace_in_files
-Replace text in files with timeout and depth control.
-
-**Parameters:**
-- `search` (str): Search pattern (regex)
-- `replace` (str): Replacement text
-- `path` (str, optional): Directory or file path (default: \".\")
-- `file_pattern` (str, optional): File name pattern (default: \"*\")
-- `recursive` (bool, optional): Search recursively (default: True)
-- `max_depth` (int, optional): Maximum depth for recursive search (default: None for unlimited)
-- `timeout` (float, optional): Maximum time in seconds for operation (default: 30.0)
-
-**Returns:**
-Dictionary containing:
-- `results`: List of files with replacement counts
-- `completed`: Whether operation completed fully
-- `files_processed`: Number of files processed
-- `timeout_occurred`: Whether operation timed out
-- `error`: Any error message
-
-### get_file_info
-Get detailed information about a file.
-
-**Parameters:**
-- `path` (str): File path
-
-### patch_file
-Apply precise modifications to files using various patch formats.
-
-**Parameters:**
-- `path` (str): File path to patch
-- `patches` (list): List of patch operations to apply
-- `backup` (bool, optional): Create a backup before patching (default: True)
-- `dry_run` (bool, optional): Preview changes without applying them (default: False)
-- `create_dirs` (bool, optional): Create parent directories if needed (default: False)
-
-**Patch Formats:**
-
-1. **Line-based patches:**
-   ```json
-   {"line": 10, "content": "new line content"}
-   {"start_line": 15, "end_line": 17, "content": "multi-line
-replacement"}
-   ```
-
-2. **Pattern-based patches:**
-   ```json
-   {"find": "old text", "replace": "new text", "occurrence": 1}
-   {"find": "regex.*pattern", "replace": "replacement", "regex": true}
-   ```
-
-3. **Context-based patches:**
-   ```json
-   {
-     "context": ["line before", "target line", "line after"],
-     "replace": ["line before", "new line", "line after"]
-   }
-   ```
-
-**Returns:**
-Dictionary containing:
-- `success`: Whether any patches were applied successfully
-- `patches_applied`: Number of patches successfully applied
-- `patches_total`: Total number of patches attempted
-- `backup_path`: Path to backup file (if created)
-- `changes`: Detailed information about each patch
-- `dry_run`: Whether this was a dry run
-
-## Security
-
-- All file paths are validated to prevent directory traversal attacks
-- Operations are restricted to the server's working directory and subdirectories
-- Binary files are handled safely with base64 encoding
+See the `examples/` directory for detailed usage examples:
+- `example_usage.py` - Basic file operations
+- `enhanced_features_examples.py` - Advanced search and depth control
+- `patch_examples.py` - Various patching techniques
+- `project_directory_examples.py` - Project directory usage
 
 ## Development
 
-### Running tests
+### Running Tests
 
 ```bash
-python test_mcp_server.py
+# Run all tests
+python -m pytest tests/
+
+# Run specific test
+python tests/test_patch.py
 ```
 
-### Example usage
+### Project Structure
 
-```python
-# See example_usage.py for more examples
 ```
+mcp-file-edit/
+├── server.py              # Main MCP server implementation
+├── pyproject.toml         # Project configuration
+├── README.md              # This file
+├── LICENSE                # MIT license
+├── examples/              # Usage examples
+│   ├── example_usage.py
+│   ├── patch_examples.py
+│   └── ...
+└── tests/                 # Test files
+    ├── test_patch.py
+    ├── test_enhanced.py
+    └── ...
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
-MIT License - see LICENSE file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built with [FastMCP](https://github.com/jlowin/fastmcp) framework
+- Implements the [Model Context Protocol](https://modelcontextprotocol.io) specification
+- Inspired by the need for safe, powerful file system access for LLMs
+
+## Support
+
+For issues, questions, or suggestions, please open an issue on [GitHub](https://github.com/patrickomatik/mcp-file-edit/issues).

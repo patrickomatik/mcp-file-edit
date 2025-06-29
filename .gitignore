@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -18,13 +19,29 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-.env
-.venv
-env/
+
+# Virtual Environment
 venv/
 ENV/
-.idea/
+env/
+.venv/
+
+# IDE
 .vscode/
+.idea/
 *.swp
 *.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Project specific
+*.backup_*
+test_project_temp/
+.mcp_project_dir
+
+# Distribution
+*.tar.gz
+*.zip
