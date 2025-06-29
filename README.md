@@ -1,6 +1,6 @@
 # MCP File Edit
 
-A powerful Model Context Protocol (MCP) server that provides comprehensive file system operations. Built with FastMCP, this server enables LLMs to safely interact with your file system through a wide range of operations.
+A simple Model Context Protocol (MCP) server that provides comprehensive file system operations including the ability to patch files and perform basic code analysis aimed at reducing Claude Desktop's token usage when compared to other similar tools. Built on FastMCP.
 
 ## Features
 
