@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, Iterator, Tuple
 from datetime import datetime
 
+from code_analyzer import CodeAnalyzer, list_functions, get_function_at_line, get_code_structure, search_functions
 from mcp.server.fastmcp import FastMCP
 
 # Create the MCP server instance
@@ -903,6 +904,87 @@ async def get_project_directory() -> Dict[str, Any]:
         "exists": PROJECT_DIR.exists()
     }
 
+
+
+@mcp.tool()
+async def list_functions(
+    path: str,
+    language: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    List all functions in a code file.
+    
+    Args:
+        path: File path
+        language: Programming language (auto-detected if not specified)
+        
+    Returns:
+        List of function information including name, line numbers, signature, etc.
+    """
+    from code_analyzer import list_functions as _list_functions
+    return await _list_functions(path, language)
+
+@mcp.tool()
+async def get_function_at_line(
+    path: str,
+    line_number: int,
+    language: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Get the function that contains a specific line number.
+    
+    Args:
+        path: File path
+        line_number: Line number to search for
+        language: Programming language (auto-detected if not specified)
+        
+    Returns:
+        Function information if found, None otherwise
+    """
+    from code_analyzer import get_function_at_line as _get_function_at_line
+    return await _get_function_at_line(path, line_number, language)
+
+@mcp.tool()
+async def get_code_structure(
+    path: str,
+    language: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Get the overall code structure of a file.
+    
+    Args:
+        path: File path
+        language: Programming language (auto-detected if not specified)
+        
+    Returns:
+        Dictionary containing imports, classes, functions, and other structural elements
+    """
+    from code_analyzer import get_code_structure as _get_code_structure
+    return await _get_code_structure(path, language)
+
+@mcp.tool()
+async def search_functions(
+    pattern: str,
+    path: str = ".",
+    file_pattern: str = "*.py",
+    recursive: bool = True,
+    max_depth: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Search for functions by name pattern across files.
+    
+    Args:
+        pattern: Function name pattern (regex)
+        path: Directory to search in
+        file_pattern: File name pattern
+        recursive: Search recursively
+        max_depth: Maximum depth for recursive search
+        
+    Returns:
+        Dictionary with search results
+    """
+    from code_analyzer import search_functions as _search_functions
+    return await _search_functions(pattern, path, file_pattern, recursive, max_depth)
 
 @mcp.tool()
 async def patch_file(

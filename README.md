@@ -10,8 +10,8 @@ A powerful Model Context Protocol (MCP) server that provides comprehensive file 
 - 🔄 **Replace**: Find and replace text across multiple files
 - 🔧 **Patch**: Apply precise modifications using line, pattern, or context-based patches
 - 📍 **Project Directory**: Set a working directory for simplified relative paths
-- 🛡️ **Safety**: Built-in path traversal protection and safe operations
-- 💾 **Binary Support**: Handle both text and binary files with proper encoding
+- 🧬 **Code Analysis**: Extract functions, classes, and structure from code files
+- 🛡️ **Safety**: Built-in path traversal protection and safe operations- 💾 **Binary Support**: Handle both text and binary files with proper encoding
 
 ## Installation
 
@@ -143,6 +143,25 @@ patch_file("app.py", patches=[{
 }])
 ```
 
+### Code Analysis
+
+```python
+# List all functions in a file
+functions = list_functions("mycode.py")
+# Returns function names, signatures, line numbers, docstrings
+
+# Find function at specific line
+func = get_function_at_line("mycode.py", 42)
+# Returns the function containing line 42
+
+# Get complete code structure
+structure = get_code_structure("mycode.py")
+# Returns imports, classes, functions, and more
+
+# Search for functions by pattern
+results = search_functions("test_.*", "tests/", "*.py")
+# Finds all test functions
+
 ## Available Tools
 
 ### File Operations
@@ -165,7 +184,7 @@ patch_file("app.py", patches=[{
 ### Project Management
 - `set_project_directory` - Set the working directory context
 - `get_project_directory` - Get current project directory
-
+### Code Analysis- `list_functions` - List all functions in a code file with signatures and line numbers- `get_function_at_line` - Find which function contains a specific line- `get_code_structure` - Extract complete code structure (imports, classes, functions)- `search_functions` - Search for functions by name pattern across files
 ## Safety Features
 
 - **Path Traversal Protection**: All paths are validated to prevent directory traversal attacks

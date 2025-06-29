@@ -5,10 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2025-06-29
+## [1.0.1] - 2025-06-29
 
 ### Added
-- Initial release of MCP File Edit server
+- Code analysis features for understanding code structure:  - `list_functions` - Extract all functions with signatures and line numbers  - `get_function_at_line` - Find function containing a specific line  - `get_code_structure` - Extract imports, classes, and functions  - `search_functions` - Search for functions by name pattern- Support for Python and JavaScript code analysis- Function signature extraction with type hints- Docstring extraction and parsing## [1.0.0] - 2025-06-29### Added- Initial release of MCP File Edit server
 - Comprehensive file operations (read, write, create, delete, move, copy)
 - Directory operations with recursive support
 - Pattern-based file search with regex support
