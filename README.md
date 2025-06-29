@@ -1,6 +1,6 @@
 # MCP File Editor
 
-A Model Context Protocol (MCP) server that provides comprehensive file system operations through the stdio transport.
+A Model Context Protocol (MCP) server built with FastMCP that provides comprehensive file system operations.
 
 ## Features
 
@@ -19,28 +19,48 @@ A Model Context Protocol (MCP) server that provides comprehensive file system op
 git clone https://github.com/yourusername/mcp-file-editor.git
 cd mcp-file-editor
 
-# Install in development mode
+# Install dependencies using uv (recommended)
+uv pip install -e .
+
+# Or using pip
 pip install -e .
 ```
 
 ## Usage
 
-### As a standalone server
+### Running the server
 
 ```bash
-python mcp_file_server.py
+# Using uv
+uv run mcp run server.py
+
+# Or directly with Python
+python server.py
 ```
 
 ### Integration with Claude Desktop
 
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "file-editor": {
-      "command": "python",
-      "args": ["/path/to/mcp_file_server.py"]
+      "command": "/path/to/your/python",
+      "args": ["/path/to/mcp_file_editor/server.py"]
+    }
+  }
+}
+```
+
+Or if using uv:
+
+```json
+{
+  "mcpServers": {
+    "file-editor": {
+      "command": "uv",
+      "args": ["run", "mcp", "run", "/path/to/mcp_file_editor/server.py"]
     }
   }
 }
@@ -49,191 +69,108 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 ## Available Tools
 
 ### list_files
-List files and directories with optional filtering.
+List files and directories with optional filtering and depth control.
 
-```json
-{
-  "name": "list_files",
-  "arguments": {
-    "path": ".",
-    "pattern": "*.py",
-    "recursive": true,
-    "include_hidden": false
-  }
-}
-```
+**Parameters:**
+- `path` (str, optional): Directory path (default: current directory)
+- `pattern` (str, optional): Glob pattern for filtering (default: \"*\")
+- `recursive` (bool, optional): List recursively (default: False)
+- `include_hidden` (bool, optional): Include hidden files (default: False)
+- `max_depth` (int, optional): Maximum depth for recursive listing (default: None for unlimited)
 
 ### read_file
 Read the contents of a file.
 
-```json
-{
-  "name": "read_file",
-  "arguments": {
-    "path": "example.txt",
-    "encoding": "utf-8",
-    "lines": {
-      "start": 1,
-      "end": 10
-    }
-  }
-}
-```
+**Parameters:**
+- `path` (str): File path
+- `encoding` (str, optional): File encoding (default: "utf-8")
+- `start_line` (int, optional): Starting line number (1-based)
+- `end_line` (int, optional): Ending line number (inclusive)
 
 ### write_file
 Write content to a file.
 
-```json
-{
-  "name": "write_file",
-  "arguments": {
-    "path": "output.txt",
-    "content": "Hello, World!",
-    "encoding": "utf-8",
-    "create_dirs": true
-  }
-}
-```
+**Parameters:**
+- `path` (str): File path
+- `content` (str): Content to write
+- `encoding` (str, optional): File encoding (default: "utf-8", or "base64" for binary)
+- `create_dirs` (bool, optional): Create parent directories if needed (default: False)
 
 ### create_file
 Create a new file with optional initial content.
 
-```json
-{
-  "name": "create_file",
-  "arguments": {
-    "path": "new_file.txt",
-    "content": "Initial content",
-    "create_dirs": true
-  }
-}
-```
+**Parameters:**
+- `path` (str): File path
+- `content` (str, optional): Initial content (default: "")
+- `create_dirs` (bool, optional): Create parent directories if needed (default: False)
 
 ### delete_file
 Delete a file or directory.
 
-```json
-{
-  "name": "delete_file",
-  "arguments": {
-    "path": "old_file.txt",
-    "recursive": false
-  }
-}
-```
+**Parameters:**
+- `path` (str): File or directory path
+- `recursive` (bool, optional): Delete directories recursively (default: False)
 
 ### move_file
 Move or rename a file.
 
-```json
-{
-  "name": "move_file",
-  "arguments": {
-    "source": "old_name.txt",
-    "destination": "new_name.txt",
-    "overwrite": false
-  }
-}
-```
+**Parameters:**
+- `source` (str): Source path
+- `destination` (str): Destination path
+- `overwrite` (bool, optional): Overwrite if exists (default: False)
 
 ### copy_file
 Copy a file or directory.
 
-```json
-{
-  "name": "copy_file",
-  "arguments": {
-    "source": "original.txt",
-    "destination": "copy.txt",
-    "overwrite": false
-  }
-}
-```
+**Parameters:**
+- `source` (str): Source path
+- `destination` (str): Destination path
+- `overwrite` (bool, optional): Overwrite if exists (default: False)
 
 ### search_files
-Search for patterns in files.
+Search for patterns in files with timeout and depth control.
 
-```json
-{
-  "name": "search_files",
-  "arguments": {
-    "path": ".",
-    "pattern": "TODO|FIXME",
-    "file_pattern": "*.py",
-    "recursive": true
-  }
-}
-```
+**Parameters:**
+- `pattern` (str): Search pattern (regex)
+- `path` (str, optional): Directory to search in (default: \".\")
+- `file_pattern` (str, optional): File name pattern (default: \"*\")
+- `recursive` (bool, optional): Search recursively (default: True)
+- `max_depth` (int, optional): Maximum depth for recursive search (default: None for unlimited)
+- `timeout` (float, optional): Maximum time in seconds for search operation (default: 30.0)
+
+**Returns:**
+Dictionary containing:
+- `results`: List of files with matches
+- `completed`: Whether search completed fully
+- `files_searched`: Number of files searched
+- `timeout_occurred`: Whether search timed out
+- `error`: Any error message
 
 ### replace_in_files
-Replace text in files.
+Replace text in files with timeout and depth control.
 
-```json
-{
-  "name": "replace_in_files",
-  "arguments": {
-    "path": ".",
-    "search": "old_text",
-    "replace": "new_text",
-    "file_pattern": "*.txt",
-    "recursive": true
-  }
-}
-```
+**Parameters:**
+- `search` (str): Search pattern (regex)
+- `replace` (str): Replacement text
+- `path` (str, optional): Directory or file path (default: \".\")
+- `file_pattern` (str, optional): File name pattern (default: \"*\")
+- `recursive` (bool, optional): Search recursively (default: True)
+- `max_depth` (int, optional): Maximum depth for recursive search (default: None for unlimited)
+- `timeout` (float, optional): Maximum time in seconds for operation (default: 30.0)
+
+**Returns:**
+Dictionary containing:
+- `results`: List of files with replacement counts
+- `completed`: Whether operation completed fully
+- `files_processed`: Number of files processed
+- `timeout_occurred`: Whether operation timed out
+- `error`: Any error message
 
 ### get_file_info
 Get detailed information about a file.
 
-```json
-{
-  "name": "get_file_info",
-  "arguments": {
-    "path": "example.txt"
-  }
-}
-```
-
-## Protocol
-
-The server implements the Model Context Protocol using JSON-RPC 2.0 over stdio.
-
-### Initialize
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "initialize",
-  "params": {},
-  "id": 1
-}
-```
-
-### List Tools
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/list",
-  "params": {},
-  "id": 2
-}
-```
-
-### Call Tool
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "read_file",
-    "arguments": {
-      "path": "example.txt"
-    }
-  },
-  "id": 3
-}
-```
+**Parameters:**
+- `path` (str): File path
 
 ## Security
 
@@ -243,19 +180,17 @@ The server implements the Model Context Protocol using JSON-RPC 2.0 over stdio.
 
 ## Development
 
-### Running Tests
+### Running tests
 
 ```bash
-python -m pytest tests/
+python test_mcp_server.py
 ```
 
-### Contributing
+### Example usage
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+```python
+# See example_usage.py for more examples
+```
 
 ## License
 
