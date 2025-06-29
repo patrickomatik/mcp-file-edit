@@ -8,6 +8,7 @@ A Model Context Protocol (MCP) server built with FastMCP that provides comprehen
 - **Directory Operations**: List files, create directories, recursive operations
 - **Search**: Search for patterns in files using regex
 - **Replace**: Find and replace text across multiple files
+- **Patch**: Apply precise modifications to files with line, pattern, or context-based patches
 - **File Information**: Get detailed metadata about files and directories
 - **Safety**: Built-in path traversal protection
 - **Binary Support**: Handle both text and binary files
@@ -171,6 +172,48 @@ Get detailed information about a file.
 
 **Parameters:**
 - `path` (str): File path
+
+### patch_file
+Apply precise modifications to files using various patch formats.
+
+**Parameters:**
+- `path` (str): File path to patch
+- `patches` (list): List of patch operations to apply
+- `backup` (bool, optional): Create a backup before patching (default: True)
+- `dry_run` (bool, optional): Preview changes without applying them (default: False)
+- `create_dirs` (bool, optional): Create parent directories if needed (default: False)
+
+**Patch Formats:**
+
+1. **Line-based patches:**
+   ```json
+   {"line": 10, "content": "new line content"}
+   {"start_line": 15, "end_line": 17, "content": "multi-line
+replacement"}
+   ```
+
+2. **Pattern-based patches:**
+   ```json
+   {"find": "old text", "replace": "new text", "occurrence": 1}
+   {"find": "regex.*pattern", "replace": "replacement", "regex": true}
+   ```
+
+3. **Context-based patches:**
+   ```json
+   {
+     "context": ["line before", "target line", "line after"],
+     "replace": ["line before", "new line", "line after"]
+   }
+   ```
+
+**Returns:**
+Dictionary containing:
+- `success`: Whether any patches were applied successfully
+- `patches_applied`: Number of patches successfully applied
+- `patches_total`: Total number of patches attempted
+- `backup_path`: Path to backup file (if created)
+- `changes`: Detailed information about each patch
+- `dry_run`: Whether this was a dry run
 
 ## Security
 
