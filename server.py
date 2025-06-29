@@ -51,6 +51,9 @@ BINARY_EXTENSIONS = {
 # Global base directory (current working directory)
 BASE_DIR = Path.cwd()
 
+# Global project directory (optional, for project-relative paths)
+PROJECT_DIR = None
+
 def is_safe_path(path: Path) -> bool:
     """Check if a path is safe to access (no directory traversal)"""
     try:
@@ -58,6 +61,31 @@ def is_safe_path(path: Path) -> bool:
         return resolved.is_relative_to(BASE_DIR)
     except (ValueError, RuntimeError):
         return False
+
+
+def resolve_path(path: str) -> Path:
+    """
+    Resolve a path relative to project directory if set, otherwise relative to BASE_DIR.
+    
+    Args:
+        path: Input path (can be relative or absolute)
+        
+    Returns:
+        Resolved Path object
+    """
+    path_obj = Path(path)
+    
+    # If path is absolute, return as-is
+    if path_obj.is_absolute():
+        return path_obj
+    
+    # If project directory is set, resolve relative to it
+    if PROJECT_DIR:
+        return PROJECT_DIR / path
+    
+    # Otherwise, resolve relative to BASE_DIR
+    return BASE_DIR / path
+
 
 def get_file_type(path: Path) -> str:
     """Determine file type"""
@@ -130,7 +158,7 @@ async def list_files(
     Returns:
         List of file/directory information
     """
-    target_path = BASE_DIR / path
+    target_path = resolve_path(path)
     if not is_safe_path(target_path):
         raise ValueError("Invalid path: directory traversal detected")
         
@@ -178,7 +206,7 @@ async def read_file(
     Returns:
         Dictionary with content, encoding, and file_type
     """
-    file_path = BASE_DIR / path
+    file_path = resolve_path(path)
     if not is_safe_path(file_path):
         raise ValueError("Invalid path: directory traversal detected")
         
@@ -235,7 +263,7 @@ async def write_file(
     Returns:
         Dictionary with path and size
     """
-    file_path = BASE_DIR / path
+    file_path = resolve_path(path)
     if not is_safe_path(file_path):
         raise ValueError("Invalid path: directory traversal detected")
         
@@ -273,7 +301,7 @@ async def create_file(
     Returns:
         File information
     """
-    file_path = BASE_DIR / path
+    file_path = resolve_path(path)
     if not is_safe_path(file_path):
         raise ValueError("Invalid path: directory traversal detected")
         
@@ -303,7 +331,7 @@ async def delete_file(
     Returns:
         Dictionary with deleted path
     """
-    target_path = BASE_DIR / path
+    target_path = resolve_path(path)
     if not is_safe_path(target_path):
         raise ValueError("Invalid path: directory traversal detected")
         
@@ -337,8 +365,8 @@ async def move_file(
     Returns:
         Dictionary with source and destination paths
     """
-    source_path = BASE_DIR / source
-    dest_path = BASE_DIR / destination
+    source_path = resolve_path(source)
+    dest_path = resolve_path(destination)
     
     if not is_safe_path(source_path) or not is_safe_path(dest_path):
         raise ValueError("Invalid path: directory traversal detected")
@@ -373,8 +401,8 @@ async def copy_file(
     Returns:
         Dictionary with source and destination paths
     """
-    source_path = BASE_DIR / source
-    dest_path = BASE_DIR / destination
+    source_path = resolve_path(source)
+    dest_path = resolve_path(destination)
     
     if not is_safe_path(source_path) or not is_safe_path(dest_path):
         raise ValueError("Invalid path: directory traversal detected")
@@ -452,7 +480,7 @@ async def search_files(
         - timeout_occurred: Whether search timed out
         - error: Any error message
     """
-    search_path = BASE_DIR / path
+    search_path = resolve_path(path)
     if not is_safe_path(search_path):
         return {
             "results": [],
@@ -567,7 +595,7 @@ async def replace_in_files(
         - timeout_occurred: Whether operation timed out
         - error: Any error message
     """
-    search_path = BASE_DIR / path
+    search_path = resolve_path(path)
     if not is_safe_path(search_path):
         return {
             "results": [],
@@ -823,6 +851,60 @@ class FilePatcher:
 
 
 @mcp.tool()
+async def set_project_directory(path: str) -> Dict[str, Any]:
+    """
+    Set the project directory for relative path operations.
+    
+    Args:
+        path: Path to the project directory (absolute or relative to current directory)
+        
+    Returns:
+        Dictionary with project directory information
+    """
+    global PROJECT_DIR
+    
+    project_path = BASE_DIR / path if not Path(path).is_absolute() else Path(path)
+    
+    if not is_safe_path(project_path):
+        raise ValueError("Invalid path: project directory must be within base directory")
+    
+    if not project_path.exists():
+        raise ValueError(f"Project directory does not exist: {path}")
+    
+    if not project_path.is_dir():
+        raise ValueError(f"Path is not a directory: {path}")
+    
+    PROJECT_DIR = project_path
+    
+    return {
+        "project_directory": str(PROJECT_DIR),
+        "relative_to_base": str(PROJECT_DIR.relative_to(BASE_DIR)),
+        "absolute_path": str(PROJECT_DIR.absolute())
+    }
+
+@mcp.tool()
+async def get_project_directory() -> Dict[str, Any]:
+    """
+    Get the current project directory.
+    
+    Returns:
+        Dictionary with current project directory information
+    """
+    if PROJECT_DIR is None:
+        return {
+            "project_directory": None,
+            "message": "No project directory set. Use set_project_directory to set one."
+        }
+    
+    return {
+        "project_directory": str(PROJECT_DIR),
+        "relative_to_base": str(PROJECT_DIR.relative_to(BASE_DIR)),
+        "absolute_path": str(PROJECT_DIR.absolute()),
+        "exists": PROJECT_DIR.exists()
+    }
+
+
+@mcp.tool()
 async def patch_file(
     path: str,
     patches: List[Dict[str, Any]],
@@ -858,7 +940,7 @@ async def patch_file(
     """
     from server import BASE_DIR, is_safe_path, get_file_type
     
-    file_path = BASE_DIR / path
+    file_path = resolve_path(path)
     if not is_safe_path(file_path):
         return {
             "success": False,
@@ -999,7 +1081,7 @@ async def get_file_info(path: str) -> Dict[str, Any]:
     Returns:
         Detailed file information
     """
-    file_path = BASE_DIR / path
+    file_path = resolve_path(path)
     if not is_safe_path(file_path):
         raise ValueError("Invalid path: directory traversal detected")
         

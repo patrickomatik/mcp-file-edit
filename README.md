@@ -9,6 +9,7 @@ A Model Context Protocol (MCP) server built with FastMCP that provides comprehen
 - **Search**: Search for patterns in files using regex
 - **Replace**: Find and replace text across multiple files
 - **Patch**: Apply precise modifications to files with line, pattern, or context-based patches
+- **Project Directory**: Set a working directory context for simplified relative paths
 - **File Information**: Get detailed metadata about files and directories
 - **Safety**: Built-in path traversal protection
 - **Binary Support**: Handle both text and binary files
@@ -28,6 +29,25 @@ pip install -e .
 ```
 
 ## Usage
+
+### Project Directory (Important!)
+
+**When using this MCP server, always set the project directory first!** This establishes a working context and allows you to use simple relative paths instead of full absolute paths.
+
+```python
+# First, set your project directory
+set_project_directory("/path/to/your/project")
+# or relative to current directory
+set_project_directory("my-project")
+
+# Check current project directory
+get_project_directory()
+
+# Now use relative paths for all operations
+read_file("src/main.py")              # Reads from project/src/main.py
+list_files("tests")                   # Lists files in project/tests
+create_file("docs/notes.md")          # Creates project/docs/notes.md
+```
 
 ### Running the server
 
@@ -68,7 +88,7 @@ Or if using uv:
 ```
 
 ## Available Tools
-
+### set_project_directorySet the project directory for all subsequent file operations. This allows using relative paths instead of absolute paths.**Parameters:**- `path` (str): Path to the project directory (absolute or relative to current directory)**Returns:**Dictionary containing:- `project_directory`: The active project directory path- `relative_to_base`: Path relative to the base directory- `absolute_path`: Absolute path of the project directory### get_project_directoryGet the current project directory setting.**Parameters:**None**Returns:**Dictionary containing current project directory information, or a message if not set.
 ### list_files
 List files and directories with optional filtering and depth control.
 
