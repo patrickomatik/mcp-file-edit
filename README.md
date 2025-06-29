@@ -69,7 +69,13 @@ After updating the configuration, restart Claude Desktop to load the MCP server.
 
 ### Project Directory (Recommended)
 
-Always set a project directory first to use relative paths:
+Set a project directory first to use relative paths:
+
+```python
+LLM chat session
+>>> Use file-edit-mcp to set project directory to /User/fred/project
+```
+
 
 ```python
 # Set project directory
@@ -83,6 +89,12 @@ list_files("tests")                   # Lists files in project/tests
 
 ### Basic File Operations
 
+
+```python
+LLM chat session
+>>> Use file-edit-mcp to read the file example.txt
+```
+
 ```python
 # Read a file
 content = read_file("example.txt")
@@ -90,20 +102,58 @@ content = read_file("example.txt")
 # Write a file
 write_file("output.txt", "Hello, World!")
 
+
+```python
+LLM chat session
+>>> Use file-edit-mcp to write 'hello, world' to the file output.txt
+```
+
 # Create a new file
 create_file("new_file.py", "# New Python file")
+
+
+```python
+LLM chat session
+>>> Use file-edit-mcp to set create a file called new_file.py
+```
 
 # Delete a file
 delete_file("old_file.txt")
 
+
+```python
+LLM chat session
+>>> Use file-edit-mcp to delete the file old_file.txt
+```
+
 # Move/rename a file
 move_file("old_name.txt", "new_name.txt")
+
+
+```python
+LLM chat session
+>>> Use file-edit-mcp to rename old_name to new_name
+```
 
 # Copy a file
 copy_file("source.txt", "destination.txt")
 ```
 
+
+```python
+LLM chat session
+>>> Use file-edit-mcp to set copy the file source to destination
+```
+
 ### Search and Replace
+
+Claude should discover and use these functions as part of a wider remit, for example whilst writing new source code to your specification.
+They can also be used for manual search and replace operations like this:
+
+```python
+LLM chat session
+>>> Use file-edit-mcp to find all TODO occurrences and summarise here.
+```
 
 ```python
 # Search for patterns
@@ -124,6 +174,8 @@ replace_in_files(
 ```
 
 ### Advanced Patching
+
+Claude should discover and use these functions as part of a wider remit, for example whilst amending source code to fix issues discovered in testing of it's own code.
 
 ```python
 # Line-based patch
