@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-06-30
+
+### Added
+- Comprehensive git operations for both local and remote repositories:
+  - `git_status`: Check repository status
+  - `git_init`: Initialize new repositories
+  - `git_clone`: Clone remote repositories
+  - `git_add`: Stage files for commit
+  - `git_commit`: Commit changes with messages
+  - `git_push`: Push commits to remote
+  - `git_pull`: Pull changes from remote
+  - `git_log`: View commit history
+  - `git_branch`: Manage branches (create, delete, list)
+  - `git_checkout`: Switch branches or commits
+  - `git_diff`: View changes (working or staged)
+  - `git_remote`: Manage remote repositories
+  - Full support for git operations on remote servers via SSH
+  - No git installation required on Claude's side
+
 ## [1.2.0] - 2025-06-30
 
 ### Added

@@ -15,6 +15,7 @@ A simple Model Context Protocol (MCP) server that provides comprehensive file sy
 - 💾 **Binary Support**: Handle both text and binary files with proper encoding
 - 🌐 **SSH Support**: Seamlessly work with remote filesystems over SSH
 - 📤 **SSH Upload/Download**: Transfer files between local and remote filesystems
+- 🔀 **Git Operations**: Full git support for both local and remote repositories
 
 ## Installation
 
@@ -328,9 +329,86 @@ result = ssh_sync(
 - Recursive directory transfers
 - Sync operations with conflict handling
 
-<<<<<<< HEAD
 ## Examples
 =======
+=======
+### Git Operations
+
+The file editor provides comprehensive git support for both local and remote repositories:
+
+```python
+# Check git status
+status = git_status()
+# Shows: branch, staged files, modified files, untracked files
+
+# Initialize a new repository
+git_init()
+
+# Clone a repository
+git_clone("https://github.com/user/repo.git", branch="main")
+
+# Stage files
+git_add("file.txt")  # Single file
+git_add(["*.py", "docs/"])  # Multiple files/patterns
+
+# Commit changes
+git_commit("feat: Add new feature")
+
+# Push to remote
+git_push("origin", "main", set_upstream=True)
+
+# Pull changes
+git_pull("origin", "main")
+
+# View commit history
+logs = git_log(limit=20, oneline=False)
+
+# Branch operations
+git_branch(create="feature/new-feature")  # Create branch
+git_checkout("feature/new-feature")  # Switch branch
+branches = git_branch()  # List branches
+git_branch(delete="old-branch")  # Delete branch
+
+# View differences
+diff = git_diff()  # Working directory changes
+diff = git_diff(cached=True)  # Staged changes
+
+# Remote management
+remotes = git_remote()  # List remotes
+git_remote(action="add", name="upstream", url="https://github.com/upstream/repo.git")
+git_remote(action="remove", name="old-remote")
+```
+
+#### Git on Remote Servers
+
+Git operations work seamlessly on remote servers via SSH:
+
+```python
+# Connect to remote server
+set_project_directory(
+    path="/home/user/project",
+    connection_type="ssh",
+    ssh_host="server.example.com",
+    ssh_username="user"
+)
+
+# All git operations now work on the remote server
+status = git_status()  # Check remote repository status
+git_add("*.js")  # Stage files on remote
+git_commit("fix: Update configuration")  # Commit on remote
+git_push()  # Push from remote to its origin
+```
+
+**Git Features:**
+- Full git command support (status, add, commit, push, pull, etc.)
+- Works identically on local and remote repositories
+- Branch management (create, switch, delete)
+- Remote repository management
+- Commit history with detailed information
+- Diff viewing for changes
+- No git installation needed on Claude's side
+
+>>>>>>> 55f824a (feat: Add comprehensive git operations support)
 ## Practical Claude Desktop Examples
 
 ### Example 1: Analyzing and Refactoring a Python Project
@@ -870,6 +948,104 @@ structure = get_code_structure("main.py")
 # - Classes: 3 (App, Database, UserAuth)
 # - Functions: 12
 # - Total lines: 450
+```
+
+#### Git Version Control
+
+**User**: "Initialize git for this project and make the first commit"
+
+**Claude**:
+```python
+# I'll initialize git and create your first commit
+
+# Initialize the repository
+result = git_init()
+# Initialized empty Git repository in /Users/you/project/.git/
+
+# Check current status
+status = git_status()
+# Untracked files: app.py, README.md, requirements.txt, config.json
+
+# Create a .gitignore file
+create_file(".gitignore", '''# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+''')
+
+# Add all files
+git_add(".")
+# Added 5 files to staging area
+
+# Make the first commit
+commit_result = git_commit("Initial commit: Project setup")
+# Created commit 7a8b9c1: Initial commit: Project setup
+```
+
+**User**: "Create a new feature branch and push it to GitHub"
+
+**Claude**:
+```python
+# I'll create a feature branch and set up the GitHub remote
+
+# First, let's add the GitHub remote
+git_remote(
+    action="add",
+    name="origin",
+    url="https://github.com/yourusername/project.git"
+)
+# Added remote 'origin'
+
+# Create and switch to a new feature branch
+git_branch(create="feature/user-authentication")
+git_checkout("feature/user-authentication")
+# Switched to new branch 'feature/user-authentication'
+
+# Make some changes for the feature
+create_file("auth.py", '''"""User authentication module."""
+import hashlib
+import secrets
+
+class UserAuth:
+    def __init__(self):
+        self.users = {}
+    
+    def create_user(self, username, password):
+        salt = secrets.token_hex(16)
+        password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+        self.users[username] = {
+            "salt": salt,
+            "password_hash": password_hash
+        }
+        return True
+''')
+
+# Stage and commit the changes
+git_add("auth.py")
+git_commit("feat: Add user authentication module")
+
+# Push the branch to GitHub
+git_push("origin", "feature/user-authentication", set_upstream=True)
+# Branch 'feature/user-authentication' set up to track 'origin/feature/user-authentication'
+# Successfully pushed to GitHub
 ```
 
 #### Creating Project Templates
