@@ -154,7 +154,7 @@ async def get_file_info_async(path: Path) -> Dict[str, Any]:
             "error": str(e)
         }
 
-def get_file_info(path: Path) -> Dict[str, Any]:
+def get_file_info_sync(path: Path) -> Dict[str, Any]:
     """Get detailed file information"""
     try:
         stat_info = path.stat()
