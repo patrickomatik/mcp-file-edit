@@ -328,12 +328,619 @@ result = ssh_sync(
 - Recursive directory transfers
 - Sync operations with conflict handling
 
+<<<<<<< HEAD
 ## Examples
+=======
+## Practical Claude Desktop Examples
+
+### Example 1: Analyzing and Refactoring a Python Project
+
+**User**: "Can you help me refactor this Python project in /Users/me/projects/webapp?"
+
+**Claude**:
+```python
+# First, I'll set the project directory to work with your files
+set_project_directory("/Users/me/projects/webapp")
+
+# Let me explore the project structure
+files = list_files(recursive=True, pattern="*.py")
+# Found: app.py, models.py, utils.py, tests/test_app.py, etc.
+
+# Let's look at the main application file
+content = read_file("app.py")
+# I can see this is a Flask application with some issues...
+
+# Let me check the code structure
+structure = get_code_structure("app.py")
+# Found 15 functions, 3 classes, various imports
+
+# Search for potential issues
+results = search_files("TODO|FIXME|XXX", pattern="*.py")
+# Found 8 TODOs across different files
+
+# Let's refactor the database connection function
+patch_file(
+    "app.py",
+    patches=[{
+        "find": "def get_db():\n    return sqlite3.connect('database.db')",
+        "replace": "def get_db():\n    \"\"\"Get database connection with proper error handling.\"\"\"\n    try:\n        conn = sqlite3.connect('database.db')\n        conn.row_factory = sqlite3.Row\n        return conn\n    except sqlite3.Error as e:\n        current_app.logger.error(f'Database connection failed: {e}')\n        raise"
+    }]
+)
+
+# Create a new configuration file
+create_file(
+    "config.py",
+    content='''"""Application configuration."""
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-this'
+    DATABASE_URL = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
+    DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+'''
+)
+```
+
+### Example 2: Deploying a Web Application to a Remote Server
+
+**User**: "I need to deploy my React app to my VPS at server.example.com"
+
+**Claude**:
+```python
+# First, let's connect to your remote server
+set_project_directory(
+    path="/var/www/myapp",
+    connection_type="ssh",
+    ssh_host="server.example.com",
+    ssh_username="deploy",
+    ssh_port=22
+)
+
+# Check what's currently on the server
+files = list_files()
+# I see there's an old version deployed...
+
+# Create a backup of the current deployment
+create_file("backup_timestamp.txt", datetime.now().isoformat())
+move_file("current", f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+
+# Now let's upload your built React app
+# First, let me check your local build
+set_project_directory("/Users/you/projects/react-app", connection_type="local")
+
+# Make sure you have a fresh build
+local_files = list_files("build", recursive=True)
+# Good, I can see the build directory with all assets
+
+# Switch back to SSH and upload
+set_project_directory(
+    "ssh://deploy@server.example.com/var/www/myapp",
+    connection_type="ssh"
+)
+
+# Upload the entire build directory
+result = ssh_upload(
+    local_path="/Users/you/projects/react-app/build",
+    remote_path="current",
+    recursive=True,
+    overwrite=True
+)
+# Uploaded 156 files successfully
+
+# Set proper permissions
+for html_file in list_files("current", pattern="*.html"):
+    # Note: You might need to run chmod via SSH separately
+    pass
+
+# Create/update the nginx configuration
+config_content = read_file("/etc/nginx/sites-available/myapp")
+# Let me update the configuration...
+```
+
+### Example 3: Analyzing Logs Across Multiple Servers
+
+**User**: "I need to investigate an issue that happened yesterday across our three web servers"
+
+**Claude**:
+```python
+# I'll help you gather and analyze logs from all three servers
+
+# Server 1 - Web Frontend
+set_project_directory(
+    "ssh://admin@web1.example.com/var/log",
+    connection_type="ssh"
+)
+
+# Search for errors in yesterday's logs
+error_logs = search_files(
+    "ERROR|CRITICAL|Exception",
+    pattern="*.log",
+    recursive=True
+)
+# Found 45 matches in nginx/error.log and app/production.log
+
+# Download yesterday's logs for detailed analysis
+result = ssh_download(
+    remote_path="nginx/access.log.1",
+    local_path="/tmp/analysis/web1_access.log"
+)
+
+# Server 2 - API Backend
+set_project_directory(
+    "ssh://admin@api.example.com/var/log",
+    connection_type="ssh"
+)
+
+# Check for database connection errors
+db_errors = search_files(
+    "connection refused|timeout|Connection reset",
+    pattern="postgresql*.log"
+)
+# Found 12 connection timeout errors between 14:30-14:45
+
+# Download the specific time range
+result = ssh_download(
+    remote_path="app/api.log",
+    local_path="/tmp/analysis/api.log"
+)
+
+# Server 3 - Background Workers
+set_project_directory(
+    "ssh://admin@worker.example.com/var/log",
+    connection_type="ssh"
+)
+
+# Check for job failures
+job_failures = search_files(
+    "Job.*failed|Task.*error",
+    pattern="worker*.log"
+)
+
+# Now analyze locally
+set_project_directory("/tmp/analysis", connection_type="local")
+
+# Correlate timestamps across all logs
+all_logs = list_files(pattern="*.log")
+for log_file in all_logs:
+    content = read_file(log_file['name'])
+    # ... analyze and correlate events
+```
+
+### Example 4: Maintaining Configuration Files Across Environments
+
+**User**: "I need to update configuration files across dev, staging, and production environments"
+
+**Claude**:
+```python
+# Let's create a systematic approach to managing your configurations
+
+# First, let's work with your configuration templates locally
+set_project_directory("/Users/you/configs", connection_type="local")
+
+# Create a base configuration template
+create_file(
+    "base_config.yaml",
+    content="""# Base configuration for all environments
+app:
+  name: MyApplication
+  version: 2.1.0
+  
+logging:
+  level: INFO
+  format: json
+  
+metrics:
+  enabled: true
+  port: 9090
+"""
+)
+
+# Create environment-specific overrides
+environments = ["dev", "staging", "prod"]
+for env in environments:
+    create_file(
+        f"{env}_config.yaml",
+        content=f"""# {env.title()} environment configuration
+env: {env}
+database:
+  host: {env}-db.internal
+  pool_size: {'5' if env == 'dev' else '20'}
+  
+api:
+  rate_limit: {'100' if env == 'dev' else '1000'}
+  debug: {'true' if env == 'dev' else 'false'}
+"""
+    )
+
+# Now deploy to each environment
+servers = {
+    "dev": "dev.example.com",
+    "staging": "staging.example.com",
+    "prod": "prod1.example.com"
+}
+
+for env, host in servers.items():
+    # Connect to the server
+    set_project_directory(
+        f"ssh://deploy@{host}/etc/myapp",
+        connection_type="ssh"
+    )
+    
+    # Backup existing configuration
+    if await file_exists("config.yaml"):
+        copy_file("config.yaml", f"config.yaml.backup.{datetime.now().strftime('%Y%m%d')}")
+    
+    # Upload the new configuration
+    result = ssh_upload(
+        local_path=f"/Users/you/configs/{env}_config.yaml",
+        remote_path="config.yaml"
+    )
+    
+    # Verify the upload
+    content = read_file("config.yaml")
+    print(f"✓ Updated configuration on {env} server")
+```
+
+### Example 5: Collaborative Code Review and Fixes
+
+**User**: "Can you review my code and fix any security issues you find?"
+
+**Claude**:
+```python
+# Let's do a comprehensive security review of your codebase
+set_project_directory("/Users/you/projects/webapp")
+
+# First, let's search for common security issues
+
+# 1. Check for hardcoded secrets
+secrets_search = search_files(
+    "password.*=.*['\"]|api_key.*=.*['\"]|secret.*=.*['\"]|token.*=.*['\"]",
+    pattern="*.py,*.js,*.env*"
+)
+# Found potential hardcoded secrets in config.py and test_api.py
+
+# 2. Look for SQL injection vulnerabilities
+sql_issues = search_files(
+    "execute\(.*%.*%|execute\(.*format\(|execute\(.*\+.*",
+    pattern="*.py"
+)
+# Found 3 potential SQL injection points
+
+# Let's fix the SQL injection in user.py
+patch_file(
+    "models/user.py",
+    patches=[{
+        "find": 'cursor.execute(f"SELECT * FROM users WHERE email = \'{email}\'")',
+        "replace": 'cursor.execute("SELECT * FROM users WHERE email = %s", (email,))'
+    }]
+)
+
+# 3. Check for missing input validation
+validation_check = list_functions("routes.py")
+# I'll examine each route handler...
+
+# Fix missing validation in the user registration endpoint
+patch_file(
+    "routes.py",
+    patches=[{
+        "find": "@app.route('/register', methods=['POST'])\ndef register():\n    email = request.form['email']\n    password = request.form['password']",
+        "replace": "@app.route('/register', methods=['POST'])\ndef register():\n    email = request.form.get('email', '').strip()\n    password = request.form.get('password', '')\n    \n    # Validate input\n    if not email or not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):\n        return jsonify({'error': 'Invalid email address'}), 400\n    if len(password) < 8:\n        return jsonify({'error': 'Password must be at least 8 characters'}), 400"
+    }]
+)
+
+# 4. Create a security configuration file
+create_file(
+    "security.py",
+    content='''"""Security configuration and utilities."""
+import os
+from functools import wraps
+from flask import request, jsonify
+import secrets
+
+# Security headers
+SECURITY_HEADERS = {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-XSS-Protection': '1; mode=block',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+}
+
+# Rate limiting configuration
+RATE_LIMIT_REQUESTS = 100
+RATE_LIMIT_WINDOW = 3600  # 1 hour
+
+def generate_secure_token():
+    """Generate a cryptographically secure token."""
+    return secrets.token_urlsafe(32)
+
+def require_api_key(f):
+    """Decorator to require API key for endpoints."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key')
+        if not api_key or not validate_api_key(api_key):
+            return jsonify({'error': 'Invalid or missing API key'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+'''
+)
+
+# 5. Create a security audit report
+report = f"""# Security Audit Report
+Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+## Issues Found and Fixed:
+1. SQL Injection: Fixed {len(sql_issues['results'])} vulnerable queries
+2. Hardcoded Secrets: Found {len(secrets_search['results'])} instances
+3. Input Validation: Added validation to user registration
+4. Security Headers: Created security configuration file
+
+## Recommendations:
+- Move all secrets to environment variables
+- Implement rate limiting on all endpoints  
+- Add CSRF protection to forms
+- Enable security headers in production
+- Regular dependency updates
+"""
+
+create_file("SECURITY_AUDIT.md", report)
+```
+
+### More Practical Claude Desktop Interactions
+
+#### Quick File Operations
+
+**User**: "List files in the current directory"
+
+**Claude**:
+```python
+# I'll list the files in your current directory
+files = list_files()
+# Here are the files I found:
+# - README.md (2.5 KB)
+# - app.py (10.2 KB) 
+# - requirements.txt (456 bytes)
+# - tests/ (directory)
+# - static/ (directory)
+```
+
+**User**: "Show me what's in the tests folder"
+
+**Claude**:
+```python
+test_files = list_files("tests", recursive=True)
+# Found in tests/:
+# - test_app.py (3.2 KB)
+# - test_models.py (2.8 KB)
+# - test_utils.py (1.5 KB)
+# - fixtures/test_data.json (890 bytes)
+```
+
+#### Remote Server Management
+
+**User**: "Use the remote server user@foo.example.com, set remote working directory to /home/user/project_a and upload the file readme.txt"
+
+**Claude**:
+```python
+# I'll connect to your remote server and upload the file
+set_project_directory(
+    path="/home/user/project_a",
+    connection_type="ssh",
+    ssh_host="foo.example.com",
+    ssh_username="user"
+)
+# Connected to foo.example.com as user
+
+# Now uploading readme.txt from your local directory
+result = ssh_upload(
+    local_path="readme.txt",
+    remote_path="readme.txt"
+)
+# Successfully uploaded readme.txt (1,234 bytes)
+```
+
+**User**: "Check if the file was uploaded correctly and show me what files are on the server"
+
+**Claude**:
+```python
+# Let me verify the upload and show you the directory contents
+files = list_files()
+# Files in /home/user/project_a:
+# - readme.txt (1,234 bytes) - just uploaded
+# - config.json (456 bytes)
+# - src/ (directory)
+# - logs/ (directory)
+
+# Let's verify the content matches
+content = read_file("readme.txt")
+# The file contains your project documentation and was uploaded successfully
+```
+
+#### Editing Configuration Files
+
+**User**: "I need to update the database connection string in my config file"
+
+**Claude**:
+```python
+# I'll help you update the database configuration
+# First, let me read the current config
+config_content = read_file("config.json")
+
+# I'll update the database connection string
+patch_file(
+    "config.json",
+    patches=[{
+        "find": "\"database_url\": \"postgresql://localhost/myapp\"",
+        "replace": "\"database_url\": \"postgresql://db.example.com:5432/myapp_prod\""
+    }]
+)
+# Configuration updated successfully
+```
+
+#### Searching Across Files
+
+**User**: "Find all TODO comments in my Python files"
+
+**Claude**:
+```python
+# I'll search for TODO comments across all Python files
+todos = search_files(
+    pattern="TODO|FIXME|XXX",
+    file_pattern="*.py",
+    recursive=True
+)
+
+# Found 12 TODOs:
+# app.py:45 - TODO: Add error handling for database connection
+# app.py:89 - TODO: Implement rate limiting
+# models.py:23 - FIXME: This query is not optimized
+# utils.py:67 - TODO: Add unit tests for this function
+# ...
+```
+
+#### Backing Up and Restoring
+
+**User**: "Create a backup of my entire project directory"
+
+**Claude**:
+```python
+# I'll create a timestamped backup of your project
+from datetime import datetime
+
+backup_name = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+# Create backup directory
+create_file(f"../{backup_name}/.backup_info", f"Backup created at {datetime.now()}")
+
+# Copy all files
+files = list_files(recursive=True)
+for file in files:
+    if file['type'] == 'file':
+        content = read_file(file['name'])
+        write_file(f"../{backup_name}/{file['name']}", content)
+        
+# Backup created successfully at ../{backup_name}/
+```
+
+#### Working with Multiple Files
+
+**User**: "Replace all instances of 'http://' with 'https://' in all my config files"
+
+**Claude**:
+```python
+# I'll update all config files to use HTTPS
+result = replace_in_files(
+    search="http://",
+    replace="https://",
+    file_pattern="*.conf,*.json,*.yaml,*.yml",
+    recursive=True
+)
+
+# Updated 8 files:
+# - config.json: 3 replacements
+# - app.conf: 2 replacements  
+# - settings.yaml: 1 replacement
+# ...
+# Total: 15 replacements across 8 files
+```
+
+#### Analyzing Code Structure
+
+**User**: "Show me all the functions in my main.py file"
+
+**Claude**:
+```python
+# I'll analyze the code structure of main.py
+functions = list_functions("main.py")
+
+# Found 12 functions in main.py:
+# 1. initialize_app() - Line 10-25: Sets up the application
+# 2. connect_database() - Line 28-45: Establishes database connection
+# 3. authenticate_user() - Line 48-72: Handles user authentication
+# 4. process_request() - Line 75-95: Main request handler
+# ...
+
+# Let me also show you the overall structure
+structure = get_code_structure("main.py")
+# File structure:
+# - Imports: 8 (flask, sqlalchemy, ...)
+# - Classes: 3 (App, Database, UserAuth)
+# - Functions: 12
+# - Total lines: 450
+```
+
+#### Creating Project Templates
+
+**User**: "Create a basic Flask project structure for me"
+
+**Claude**:
+```python
+# I'll create a basic Flask project structure
+
+# Create main application file
+create_file("app.py", '''from flask import Flask, render_template
+
+app = Flask(__name__)
+app.config.from_object('config.Config')
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+if __name__ == '__main__':
+    app.run(debug=True)
+''')
+
+# Create configuration
+create_file("config.py", '''import os
+
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
+    DATABASE_URL = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
+''')
+
+# Create requirements file
+create_file("requirements.txt", '''Flask==2.3.2
+SQLAlchemy==2.0.19
+python-dotenv==1.0.0
+''')
+
+# Create directory structure
+create_file("templates/index.html", '''<!DOCTYPE html>
+<html>
+<head>
+    <title>My Flask App</title>
+</head>
+<body>
+    <h1>Welcome to Flask!</h1>
+</body>
+</html>
+''')
+
+create_file("static/style.css", '''body {
+    font-family: Arial, sans-serif;
+    margin: 40px;
+}
+''')
+
+create_file(".env.example", '''SECRET_KEY=your-secret-key-here
+DATABASE_URL=sqlite:///app.db
+''')
+
+# Flask project structure created successfully!
+```
+
+## Code Examples
+
 See the `examples/` directory for detailed usage examples:
 - `example_usage.py` - Basic file operations
 - `enhanced_features_examples.py` - Advanced search and depth control
 - `patch_examples.py` - Various patching techniques
 - `project_directory_examples.py` - Project directory usage
+- `ssh_transfer_examples.py` - SSH upload/download operations
 
 ## Development
 
