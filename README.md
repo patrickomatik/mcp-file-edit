@@ -419,7 +419,6 @@ git_push()  # Push from remote to its origin
 - Diff viewing for changes
 - No git installation needed on Claude's side
 
->>>>>>> 55f824a (feat: Add comprehensive git operations support)
 ## Practical Claude Desktop Examples
 
 ### Example 1: Analyzing and Refactoring a Python Project
