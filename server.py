@@ -18,6 +18,8 @@ from datetime import datetime
 
 from code_analyzer import CodeAnalyzer, list_functions, get_function_at_line, get_code_structure, search_functions
 from mcp.server.fastmcp import FastMCP
+from file_operations import FileOperationsInterface, LocalFileOperations, SSHFileOperations
+from ssh_manager import SSHConnectionManager
 
 # Create the MCP server instance
 mcp = FastMCP("file-editor")
@@ -54,6 +56,11 @@ BASE_DIR = Path.cwd()
 
 # Global project directory (optional, for project-relative paths)
 PROJECT_DIR = None
+
+# Global file operations backend and SSH manager
+FILE_OPS: FileOperationsInterface = LocalFileOperations()
+SSH_MANAGER = SSHConnectionManager()
+CONNECTION_TYPE = "local"  # "local" or "ssh"
 
 def is_safe_path(path: Path) -> bool:
     """Check if a path is safe to access (no directory traversal)"""
@@ -104,6 +111,48 @@ def get_file_type(path: Path) -> str:
             elif mime_type.startswith(('image/', 'audio/', 'video/', 'application/')):
                 return "binary"
         return "unknown"
+
+async def get_file_info_async(path: Path) -> Dict[str, Any]:
+    """Get detailed file information using the current file operations backend"""
+    try:
+        stat_info = await FILE_OPS.stat(path)
+        file_type = get_file_type(path)
+        
+        info = {
+            "name": path.name,
+            "path": str(path),
+            "type": "directory" if await FILE_OPS.is_dir(path) else "file",
+            "size": stat_info.st_size,
+            "modified": datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
+            "created": datetime.fromtimestamp(stat_info.st_ctime).isoformat(),
+            "permissions": stat.filemode(stat_info.st_mode),
+            "file_type": file_type
+        }
+        
+        # Add absolute path for local connections
+        if CONNECTION_TYPE == "local":
+            info["absolute_path"] = str(path.absolute())
+            try:
+                info["relative_path"] = str(path.relative_to(BASE_DIR))
+            except ValueError:
+                info["relative_path"] = str(path)
+        
+        # Add line count for text files
+        if file_type == "text" and not await FILE_OPS.is_dir(path):
+            try:
+                content = await FILE_OPS.read_file(path)
+                info["line_count"] = len(content.splitlines())
+            except:
+                info["line_count"] = None
+        
+        return info
+    except Exception as e:
+        return {
+            "name": path.name,
+            "path": str(path),
+            "type": "unknown",
+            "error": str(e)
+        }
 
 def get_file_info(path: Path) -> Dict[str, Any]:
     """Get detailed file information"""
@@ -160,31 +209,41 @@ async def list_files(
         List of file/directory information
     """
     target_path = resolve_path(path)
-    if not is_safe_path(target_path):
+    
+    # For local connections, check if path is safe
+    if CONNECTION_TYPE == "local" and not is_safe_path(target_path):
         raise ValueError("Invalid path: directory traversal detected")
-        
-    if not target_path.exists():
+    
+    # Check if path exists
+    if not await FILE_OPS.exists(target_path):
         raise ValueError(f"Path does not exist: {path}")
-        
+    
+    # Verify it's a directory
+    if not await FILE_OPS.is_dir(target_path):
+        raise ValueError(f"Path is not a directory: {path}")
+    
     results = []
     
     if recursive:
-        if max_depth is not None:
-            # Use depth-limited walk
-            for item in walk_with_depth(target_path, pattern, max_depth):
-                if not include_hidden and item.name.startswith('.'):
-                    continue
-                results.append(get_file_info(item))
-        else:
-            for item in target_path.rglob(pattern):
-                if not include_hidden and item.name.startswith('.'):
-                    continue
-                results.append(get_file_info(item))
-    else:
-        for item in target_path.glob(pattern):
+        # Use async walk for recursive listing
+        async for item in walk_with_depth_async(target_path, pattern, max_depth):
             if not include_hidden and item.name.startswith('.'):
                 continue
-            results.append(get_file_info(item))
+            info = await get_file_info_async(item)
+            results.append(info)
+    else:
+        # List directory contents
+        entries = await FILE_OPS.listdir(target_path)
+        import fnmatch
+        
+        for entry_name in entries:
+            if not include_hidden and entry_name.startswith('.'):
+                continue
+            
+            if fnmatch.fnmatch(entry_name, pattern):
+                entry_path = target_path / entry_name
+                info = await get_file_info_async(entry_path)
+                results.append(info)
             
     return results
 
@@ -208,21 +267,25 @@ async def read_file(
         Dictionary with content, encoding, and file_type
     """
     file_path = resolve_path(path)
-    if not is_safe_path(file_path):
+    
+    # For local connections, check if path is safe
+    if CONNECTION_TYPE == "local" and not is_safe_path(file_path):
         raise ValueError("Invalid path: directory traversal detected")
-        
-    if not file_path.exists():
+    
+    # Check if file exists
+    if not await FILE_OPS.exists(file_path):
         raise ValueError(f"File does not exist: {path}")
-        
-    if not file_path.is_file():
+    
+    # Verify it's a file
+    if not await FILE_OPS.is_file(file_path):
         raise ValueError(f"Not a file: {path}")
-        
+    
     file_type = get_file_type(file_path)
     
     if file_type == "binary":
         # Read binary file and encode as base64
-        with open(file_path, 'rb') as f:
-            content = base64.b64encode(f.read()).decode('ascii')
+        content_bytes = await FILE_OPS.read_binary(file_path)
+        content = base64.b64encode(content_bytes).decode('ascii')
         return {
             "content": content,
             "encoding": "base64",
@@ -230,14 +293,13 @@ async def read_file(
         }
     else:
         # Read text file
-        with open(file_path, 'r', encoding=encoding) as f:
-            if start_line is not None or end_line is not None:
-                lines = f.readlines()
-                start_idx = (start_line - 1) if start_line else 0
-                end_idx = end_line if end_line else len(lines)
-                content = ''.join(lines[start_idx:end_idx])
-            else:
-                content = f.read()
+        content = await FILE_OPS.read_file(file_path, encoding=encoding)
+        
+        if start_line is not None or end_line is not None:
+            lines = content.splitlines(keepends=True)
+            start_idx = (start_line - 1) if start_line else 0
+            end_idx = end_line if end_line else len(lines)
+            content = ''.join(lines[start_idx:end_idx])
                 
         return {
             "content": content,
@@ -265,25 +327,40 @@ async def write_file(
         Dictionary with path and size
     """
     file_path = resolve_path(path)
-    if not is_safe_path(file_path):
+    
+    # For local connections, check if path is safe
+    if CONNECTION_TYPE == "local" and not is_safe_path(file_path):
         raise ValueError("Invalid path: directory traversal detected")
-        
+    
+    # Create parent directories if requested
     if create_dirs:
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        
-    # Check if content is base64 encoded
+        await FILE_OPS.makedirs(file_path.parent, exist_ok=True)
+    
+    # Write content
     if encoding == "base64":
+        # Decode base64 and write as binary
         content_bytes = base64.b64decode(content)
-        with open(file_path, 'wb') as f:
-            f.write(content_bytes)
+        await FILE_OPS.write_file(file_path, content_bytes)
     else:
-        with open(file_path, 'w', encoding=encoding) as f:
-            f.write(content)
-            
-    return {
-        "path": str(file_path.relative_to(BASE_DIR)),
-        "size": file_path.stat().st_size
+        # Write as text
+        await FILE_OPS.write_file(file_path, content, encoding=encoding)
+    
+    # Get file info
+    stat_info = await FILE_OPS.stat(file_path)
+    
+    result = {
+        "path": str(file_path),
+        "size": stat_info.st_size
     }
+    
+    # Add relative path for local connections
+    if CONNECTION_TYPE == "local":
+        try:
+            result["relative_path"] = str(file_path.relative_to(BASE_DIR))
+        except ValueError:
+            result["relative_path"] = str(file_path)
+    
+    return result
 
 @mcp.tool()
 async def create_file(
@@ -303,19 +380,24 @@ async def create_file(
         File information
     """
     file_path = resolve_path(path)
-    if not is_safe_path(file_path):
+    
+    # For local connections, check if path is safe
+    if CONNECTION_TYPE == "local" and not is_safe_path(file_path):
         raise ValueError("Invalid path: directory traversal detected")
-        
-    if file_path.exists():
+    
+    # Check if file already exists
+    if await FILE_OPS.exists(file_path):
         raise ValueError(f"File already exists: {path}")
-        
+    
+    # Create parent directories if requested
     if create_dirs:
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        
-    with open(file_path, 'w', encoding='utf-8') as f:
-        f.write(content)
-        
-    return get_file_info(file_path)
+        await FILE_OPS.makedirs(file_path.parent, exist_ok=True)
+    
+    # Create the file with content
+    await FILE_OPS.write_file(file_path, content, encoding='utf-8')
+    
+    # Return file info
+    return await get_file_info_async(file_path)
 
 @mcp.tool()
 async def delete_file(
@@ -333,21 +415,38 @@ async def delete_file(
         Dictionary with deleted path
     """
     target_path = resolve_path(path)
-    if not is_safe_path(target_path):
+    
+    # For local connections, check if path is safe
+    if CONNECTION_TYPE == "local" and not is_safe_path(target_path):
         raise ValueError("Invalid path: directory traversal detected")
-        
-    if not target_path.exists():
+    
+    # Check if path exists
+    if not await FILE_OPS.exists(target_path):
         raise ValueError(f"Path does not exist: {path}")
-        
-    if target_path.is_dir():
+    
+    # Delete based on type
+    if await FILE_OPS.is_dir(target_path):
         if recursive:
-            shutil.rmtree(target_path)
+            await FILE_OPS.rmtree(target_path)
         else:
-            target_path.rmdir()
+            # For non-recursive directory deletion, check if empty
+            entries = await FILE_OPS.listdir(target_path)
+            if entries:
+                raise ValueError(f"Directory not empty: {path}. Use recursive=True to delete non-empty directories.")
+            await FILE_OPS.remove(target_path)
     else:
-        target_path.unlink()
-        
-    return {"deleted": str(target_path.relative_to(BASE_DIR))}
+        await FILE_OPS.remove(target_path)
+    
+    result = {"deleted": str(target_path)}
+    
+    # Add relative path for local connections
+    if CONNECTION_TYPE == "local":
+        try:
+            result["deleted_relative"] = str(target_path.relative_to(BASE_DIR))
+        except ValueError:
+            pass
+    
+    return result
 
 @mcp.tool()
 async def move_file(
@@ -369,21 +468,36 @@ async def move_file(
     source_path = resolve_path(source)
     dest_path = resolve_path(destination)
     
-    if not is_safe_path(source_path) or not is_safe_path(dest_path):
-        raise ValueError("Invalid path: directory traversal detected")
-        
-    if not source_path.exists():
-        raise ValueError(f"Source does not exist: {source}")
-        
-    if dest_path.exists() and not overwrite:
-        raise ValueError(f"Destination already exists: {destination}")
-        
-    source_path.rename(dest_path)
+    # For local connections, check if paths are safe
+    if CONNECTION_TYPE == "local":
+        if not is_safe_path(source_path) or not is_safe_path(dest_path):
+            raise ValueError("Invalid path: directory traversal detected")
     
-    return {
-        "source": str(source_path.relative_to(BASE_DIR)),
-        "destination": str(dest_path.relative_to(BASE_DIR))
+    # Check if source exists
+    if not await FILE_OPS.exists(source_path):
+        raise ValueError(f"Source does not exist: {source}")
+    
+    # Check destination
+    if await FILE_OPS.exists(dest_path) and not overwrite:
+        raise ValueError(f"Destination already exists: {destination}")
+    
+    # Perform the move/rename
+    await FILE_OPS.rename(source_path, dest_path)
+    
+    result = {
+        "source": str(source_path),
+        "destination": str(dest_path)
     }
+    
+    # Add relative paths for local connections
+    if CONNECTION_TYPE == "local":
+        try:
+            result["source_relative"] = str(source_path.relative_to(BASE_DIR))
+            result["destination_relative"] = str(dest_path.relative_to(BASE_DIR))
+        except ValueError:
+            pass
+    
+    return result
 
 @mcp.tool()
 async def copy_file(
@@ -405,25 +519,65 @@ async def copy_file(
     source_path = resolve_path(source)
     dest_path = resolve_path(destination)
     
-    if not is_safe_path(source_path) or not is_safe_path(dest_path):
-        raise ValueError("Invalid path: directory traversal detected")
-        
-    if not source_path.exists():
+    # For local connections, check if paths are safe
+    if CONNECTION_TYPE == "local":
+        if not is_safe_path(source_path) or not is_safe_path(dest_path):
+            raise ValueError("Invalid path: directory traversal detected")
+    
+    # Check if source exists
+    if not await FILE_OPS.exists(source_path):
         raise ValueError(f"Source does not exist: {source}")
-        
-    if dest_path.exists() and not overwrite:
+    
+    # Check destination
+    if await FILE_OPS.exists(dest_path) and not overwrite:
         raise ValueError(f"Destination already exists: {destination}")
-        
-    if source_path.is_dir():
-        shutil.copytree(source_path, dest_path, dirs_exist_ok=overwrite)
+    
+    # Copy based on type
+    if await FILE_OPS.is_dir(source_path):
+        await FILE_OPS.copy_tree(source_path, dest_path)
     else:
-        shutil.copy2(source_path, dest_path)
-        
-    return {
-        "source": str(source_path.relative_to(BASE_DIR)),
-        "destination": str(dest_path.relative_to(BASE_DIR))
+        await FILE_OPS.copy_file(source_path, dest_path)
+    
+    result = {
+        "source": str(source_path),
+        "destination": str(dest_path)
     }
+    
+    # Add relative paths for local connections
+    if CONNECTION_TYPE == "local":
+        try:
+            result["source_relative"] = str(source_path.relative_to(BASE_DIR))
+            result["destination_relative"] = str(dest_path.relative_to(BASE_DIR))
+        except ValueError:
+            pass
+    
+    return result
 
+
+async def walk_with_depth_async(path: Path, pattern: str, max_depth: Optional[int] = None) -> AsyncIterator[Path]:
+    """Walk directory tree with optional depth limit using current file operations backend"""
+    import fnmatch
+    
+    async def _walk(current_path: Path, current_depth: int = 0) -> AsyncIterator[Path]:
+        if max_depth is not None and current_depth > max_depth:
+            return
+        
+        try:
+            entries = await FILE_OPS.listdir(current_path)
+            for entry_name in entries:
+                entry_path = current_path / entry_name
+                
+                if fnmatch.fnmatch(entry_name, pattern):
+                    yield entry_path
+                
+                if await FILE_OPS.is_dir(entry_path):
+                    async for subentry in _walk(entry_path, current_depth + 1):
+                        yield subentry
+        except Exception:
+            pass  # Skip inaccessible directories
+    
+    async for item in _walk(path):
+        yield item
 
 def walk_with_depth(path: Path, pattern: str, max_depth: Optional[int] = None) -> Iterator[Path]:
     """
@@ -482,7 +636,9 @@ async def search_files(
         - error: Any error message
     """
     search_path = resolve_path(path)
-    if not is_safe_path(search_path):
+    
+    # For local connections, check if path is safe
+    if CONNECTION_TYPE == "local" and not is_safe_path(search_path):
         return {
             "results": [],
             "completed": False,
@@ -500,25 +656,34 @@ async def search_files(
     async def _search():
         nonlocal files_searched
         
-        if search_path.is_file():
+        # Check if search_path exists
+        if not await FILE_OPS.exists(search_path):
+            raise ValueError(f"Path does not exist: {path}")
+        
+        files_to_search = []
+        
+        if await FILE_OPS.is_file(search_path):
             files_to_search = [search_path]
         else:
             if recursive:
-                if max_depth is not None:
-                    # Use depth-limited walk
-                    files_to_search = list(walk_with_depth(search_path, file_pattern, max_depth))
-                else:
-                    files_to_search = list(search_path.rglob(file_pattern))
+                # Use async walk for file discovery
+                async for item in walk_with_depth_async(search_path, file_pattern, max_depth):
+                    if await FILE_OPS.is_file(item):
+                        files_to_search.append(item)
             else:
-                files_to_search = list(search_path.glob(file_pattern))
+                # List directory and filter
+                import fnmatch
+                entries = await FILE_OPS.listdir(search_path)
+                for entry_name in entries:
+                    if fnmatch.fnmatch(entry_name, file_pattern):
+                        entry_path = search_path / entry_name
+                        if await FILE_OPS.is_file(entry_path):
+                            files_to_search.append(entry_path)
                 
         for file_path in files_to_search:
             # Check if we should yield control periodically
             if files_searched % 100 == 0:
                 await asyncio.sleep(0)  # Allow other tasks to run
-                
-            if not file_path.is_file():
-                continue
                 
             file_type = get_file_type(file_path)
             if file_type != "text":
@@ -526,15 +691,18 @@ async def search_files(
                 
             matches = []
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    for line_num, line in enumerate(f, 1):
-                        if regex.search(line):
-                            match = regex.search(line)
-                            matches.append({
-                                "line_number": line_num,
-                                "line": line.rstrip(),
-                                "column": match.start() if match else 0
-                            })
+                # Read file content
+                content = await FILE_OPS.read_file(file_path, encoding='utf-8')
+                
+                # Search line by line
+                for line_num, line in enumerate(content.splitlines(), 1):
+                    if regex.search(line):
+                        match = regex.search(line)
+                        matches.append({
+                            "line_number": line_num,
+                            "line": line.rstrip(),
+                            "column": match.start() if match else 0
+                        })
                             
                 files_searched += 1
             except Exception as e:
@@ -542,10 +710,17 @@ async def search_files(
                 continue
                 
             if matches:
-                results.append({
-                    "file": str(file_path.relative_to(BASE_DIR)),
-                    "matches": matches
-                })
+                file_result = {"file": str(file_path)}
+                
+                # Add relative path for local connections
+                if CONNECTION_TYPE == "local":
+                    try:
+                        file_result["file_relative"] = str(file_path.relative_to(BASE_DIR))
+                    except ValueError:
+                        pass
+                
+                file_result["matches"] = matches
+                results.append(file_result)
     
     try:
         # Run search with timeout
@@ -597,7 +772,9 @@ async def replace_in_files(
         - error: Any error message
     """
     search_path = resolve_path(path)
-    if not is_safe_path(search_path):
+    
+    # For local connections, check if path is safe
+    if CONNECTION_TYPE == "local" and not is_safe_path(search_path):
         return {
             "results": [],
             "completed": False,
@@ -615,42 +792,59 @@ async def replace_in_files(
     async def _replace():
         nonlocal files_processed
         
-        if search_path.is_file():
+        # Check if search_path exists
+        if not await FILE_OPS.exists(search_path):
+            raise ValueError(f"Path does not exist: {path}")
+        
+        files_to_process = []
+        
+        if await FILE_OPS.is_file(search_path):
             files_to_process = [search_path]
         else:
             if recursive:
-                if max_depth is not None:
-                    files_to_process = list(walk_with_depth(search_path, file_pattern, max_depth))
-                else:
-                    files_to_process = list(search_path.rglob(file_pattern))
+                # Use async walk for file discovery
+                async for item in walk_with_depth_async(search_path, file_pattern, max_depth):
+                    if await FILE_OPS.is_file(item):
+                        files_to_process.append(item)
             else:
-                files_to_process = list(search_path.glob(file_pattern))
+                # List directory and filter
+                import fnmatch
+                entries = await FILE_OPS.listdir(search_path)
+                for entry_name in entries:
+                    if fnmatch.fnmatch(entry_name, file_pattern):
+                        entry_path = search_path / entry_name
+                        if await FILE_OPS.is_file(entry_path):
+                            files_to_process.append(entry_path)
                 
         for file_path in files_to_process:
             if files_processed % 50 == 0:
                 await asyncio.sleep(0)
-                
-            if not file_path.is_file():
-                continue
                 
             file_type = get_file_type(file_path)
             if file_type != "text":
                 continue
                 
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    
+                # Read file content
+                content = await FILE_OPS.read_file(file_path, encoding='utf-8')
+                
+                # Perform replacements
                 new_content, count = regex.subn(replace, content)
                 
                 if count > 0:
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        f.write(new_content)
-                        
-                    results.append({
-                        "file": str(file_path.relative_to(BASE_DIR)),
-                        "replacements": count
-                    })
+                    # Write back the modified content
+                    await FILE_OPS.write_file(file_path, new_content, encoding='utf-8')
+                    
+                    file_result = {"file": str(file_path), "replacements": count}
+                    
+                    # Add relative path for local connections
+                    if CONNECTION_TYPE == "local":
+                        try:
+                            file_result["file_relative"] = str(file_path.relative_to(BASE_DIR))
+                        except ValueError:
+                            pass
+                    
+                    results.append(file_result)
                     
                 files_processed += 1
             except Exception:
@@ -852,36 +1046,115 @@ class FilePatcher:
 
 
 @mcp.tool()
-async def set_project_directory(path: str) -> Dict[str, Any]:
+async def set_project_directory(
+    path: str,
+    connection_type: str = "local",
+    ssh_host: Optional[str] = None,
+    ssh_username: Optional[str] = None,
+    ssh_port: int = 22,
+    ssh_key_filename: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Set the project directory for relative path operations.
     
     Args:
         path: Path to the project directory (absolute or relative to current directory)
+              For SSH: can be a path on the remote system or ssh://user@host:port/path
+        connection_type: "local" or "ssh" 
+        ssh_host: SSH host (required if connection_type is "ssh" and not using ssh:// URL)
+        ssh_username: SSH username (required if connection_type is "ssh" and not using ssh:// URL)
+        ssh_port: SSH port (default: 22)
+        ssh_key_filename: Path to SSH private key file (default: ~/.ssh/id_rsa)
         
     Returns:
         Dictionary with project directory information
     """
-    global PROJECT_DIR
+    global PROJECT_DIR, FILE_OPS, CONNECTION_TYPE
     
-    project_path = BASE_DIR / path if not Path(path).is_absolute() else Path(path)
+    if connection_type == "ssh":
+        # Parse SSH URL if provided
+        if path.startswith("ssh://"):
+            ssh_params = SSHConnectionManager.parse_ssh_url(path)
+            ssh_host = ssh_params['host']
+            ssh_username = ssh_params.get('username') or ssh_username
+            ssh_port = ssh_params.get('port', ssh_port)
+            path = ssh_params['path']
+        
+        # Validate SSH parameters
+        if not ssh_host:
+            raise ValueError("SSH host is required for SSH connection")
+        if not ssh_username:
+            raise ValueError("SSH username is required for SSH connection")
+        
+        # Set default key if not provided
+        if not ssh_key_filename:
+            ssh_key_filename = "~/.ssh/id_rsa"
+        
+        # Connect via SSH
+        try:
+            conn, sftp = await SSH_MANAGER.connect(
+                host=ssh_host,
+                username=ssh_username,
+                port=ssh_port,
+                key_filename=ssh_key_filename
+            )
+            
+            # Create SSH file operations
+            FILE_OPS = SSHFileOperations(conn, sftp)
+            CONNECTION_TYPE = "ssh"
+            
+            # Set project directory to the remote path
+            PROJECT_DIR = Path(path)
+            
+            # Verify the directory exists on remote
+            if not await FILE_OPS.exists(PROJECT_DIR):
+                raise ValueError(f"Remote directory does not exist: {path}")
+            
+            if not await FILE_OPS.is_dir(PROJECT_DIR):
+                raise ValueError(f"Remote path is not a directory: {path}")
+            
+            return {
+                "project_directory": str(PROJECT_DIR),
+                "connection_type": "ssh",
+                "ssh_host": ssh_host,
+                "ssh_username": ssh_username,
+                "ssh_port": ssh_port,
+                "absolute_path": str(PROJECT_DIR)
+            }
+            
+        except Exception as e:
+            # Reset to local on error
+            FILE_OPS = LocalFileOperations()
+            CONNECTION_TYPE = "local"
+            raise ValueError(f"Failed to establish SSH connection: {str(e)}")
     
-    if not is_safe_path(project_path):
-        raise ValueError("Invalid path: project directory must be within base directory")
-    
-    if not project_path.exists():
-        raise ValueError(f"Project directory does not exist: {path}")
-    
-    if not project_path.is_dir():
-        raise ValueError(f"Path is not a directory: {path}")
-    
-    PROJECT_DIR = project_path
-    
-    return {
-        "project_directory": str(PROJECT_DIR),
-        "relative_to_base": str(PROJECT_DIR.relative_to(BASE_DIR)),
-        "absolute_path": str(PROJECT_DIR.absolute())
-    }
+    else:
+        # Local connection
+        FILE_OPS = LocalFileOperations()
+        CONNECTION_TYPE = "local"
+        
+        # Close any existing SSH connection
+        await SSH_MANAGER.close()
+        
+        project_path = BASE_DIR / path if not Path(path).is_absolute() else Path(path)
+        
+        if not is_safe_path(project_path):
+            raise ValueError("Invalid path: project directory must be within base directory")
+        
+        if not project_path.exists():
+            raise ValueError(f"Project directory does not exist: {path}")
+        
+        if not project_path.is_dir():
+            raise ValueError(f"Path is not a directory: {path}")
+        
+        PROJECT_DIR = project_path
+        
+        return {
+            "project_directory": str(PROJECT_DIR),
+            "connection_type": "local",
+            "relative_to_base": str(PROJECT_DIR.relative_to(BASE_DIR)),
+            "absolute_path": str(PROJECT_DIR.absolute())
+        }
 
 @mcp.tool()
 async def get_project_directory() -> Dict[str, Any]:
@@ -894,15 +1167,25 @@ async def get_project_directory() -> Dict[str, Any]:
     if PROJECT_DIR is None:
         return {
             "project_directory": None,
+            "connection_type": CONNECTION_TYPE,
             "message": "No project directory set. Use set_project_directory to set one."
         }
     
-    return {
+    result = {
         "project_directory": str(PROJECT_DIR),
-        "relative_to_base": str(PROJECT_DIR.relative_to(BASE_DIR)),
-        "absolute_path": str(PROJECT_DIR.absolute()),
-        "exists": PROJECT_DIR.exists()
+        "connection_type": CONNECTION_TYPE,
+        "absolute_path": str(PROJECT_DIR.absolute())
     }
+    
+    # Add local-specific info
+    if CONNECTION_TYPE == "local":
+        result["relative_to_base"] = str(PROJECT_DIR.relative_to(BASE_DIR))
+        result["exists"] = PROJECT_DIR.exists()
+    else:
+        # For SSH, we're already connected so the directory should exist
+        result["ssh_connected"] = SSH_MANAGER.is_connected()
+    
+    return result
 
 
 
@@ -1020,20 +1303,21 @@ async def patch_file(
     Returns:
         Dict with success status, patches applied, backup path, and change details
     """
-    from server import BASE_DIR, is_safe_path, get_file_type
-    
     file_path = resolve_path(path)
-    if not is_safe_path(file_path):
+    
+    # For local connections, check if path is safe
+    if CONNECTION_TYPE == "local" and not is_safe_path(file_path):
         return {
             "success": False,
             "error": "Invalid path: directory traversal detected",
             "patches_applied": 0
         }
     
-    if not file_path.exists():
+    # Check if file exists
+    if not await FILE_OPS.exists(file_path):
         if create_dirs and patches:
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text("")
+            await FILE_OPS.makedirs(file_path.parent, exist_ok=True)
+            await FILE_OPS.write_file(file_path, "", encoding='utf-8')
         else:
             return {
                 "success": False,
@@ -1052,9 +1336,8 @@ async def patch_file(
     
     # Read the file
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            original_content = f.read()
-            lines = original_content.splitlines(keepends=True)
+        original_content = await FILE_OPS.read_file(file_path, encoding='utf-8')
+        lines = original_content.splitlines(keepends=True)
     except Exception as e:
         return {
             "success": False,
@@ -1068,7 +1351,7 @@ async def patch_file(
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = file_path.parent / f"{file_path.name}.backup_{timestamp}"
         try:
-            backup_path.write_text(original_content)
+            await FILE_OPS.write_file(backup_path, original_content, encoding='utf-8')
         except Exception as e:
             return {
                 "success": False,
@@ -1133,8 +1416,7 @@ async def patch_file(
     # Write the file if not dry run and at least one patch succeeded
     if not dry_run and patches_applied > 0:
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            await FILE_OPS.write_file(file_path, content, encoding='utf-8')
         except Exception as e:
             return {
                 "success": False,
@@ -1147,7 +1429,7 @@ async def patch_file(
         "success": patches_applied > 0,
         "patches_applied": patches_applied,
         "patches_total": len(patches),
-        "backup_path": str(backup_path.relative_to(BASE_DIR)) if backup_path else None,
+        "backup_path": str(backup_path) if backup_path else None,
         "changes": changes,
         "dry_run": dry_run
     }
@@ -1164,10 +1446,13 @@ async def get_file_info(path: str) -> Dict[str, Any]:
         Detailed file information
     """
     file_path = resolve_path(path)
-    if not is_safe_path(file_path):
+    
+    # For local connections, check if path is safe
+    if CONNECTION_TYPE == "local" and not is_safe_path(file_path):
         raise ValueError("Invalid path: directory traversal detected")
-        
-    if not file_path.exists():
+    
+    # Check if path exists
+    if not await FILE_OPS.exists(file_path):
         raise ValueError(f"Path does not exist: {path}")
-        
-    return get_file_info(file_path)
+    
+    return await get_file_info_async(file_path)
