@@ -13,7 +13,7 @@ import mimetypes
 import asyncio
 import difflib
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union, Iterator, Tuple
+from typing import List, Dict, Any, Optional, Union, Iterator, Tuple, AsyncIterator
 from datetime import datetime
 
 from code_analyzer import CodeAnalyzer, list_functions, get_function_at_line, get_code_structure, search_functions
@@ -373,11 +373,24 @@ async def create_file(
 
     Args:
         path: File path
-        content: Initial content
+        content: Initial content (supports multi-line strings)
         create_dirs: Create parent directories if needed
 
     Returns:
         File information
+        
+    Example:
+        # Create a Python file with multi-line content
+        create_file(
+            path="file_operations.py",
+            content=\"\"\"\nFile operations abstraction layer for local and SSH operations.
+\"\"\"\n
+import os
+import stat
+import shutil
+...
+\"\"\"
+        )
     """
     file_path = resolve_path(path)
     

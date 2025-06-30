@@ -104,21 +104,6 @@ content = read_file("example.txt")
 # Write a file
 write_file("output.txt", "Hello, World!")
 
-
-```python
-LLM chat session
->>> Use file-edit-mcp to write 'hello, world' to the file output.txt
-```
-
-# Create a new file
-create_file("new_file.py", "# New Python file")
-
-
-```python
-LLM chat session
->>> Use file-edit-mcp to set create a file called new_file.py
-```
-
 # Delete a file
 delete_file("old_file.txt")
 
