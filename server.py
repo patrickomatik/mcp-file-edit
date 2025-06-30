@@ -412,6 +412,11 @@ import shutil
     # Return file info
     return await get_file_info_async(file_path)
 
+
+# Run the server
+if __name__ == "__main__":
+    mcp.run()
+
 @mcp.tool()
 async def delete_file(
     path: str,
@@ -1469,3 +1474,8 @@ async def get_file_info(path: str) -> Dict[str, Any]:
         raise ValueError(f"Path does not exist: {path}")
     
     return await get_file_info_async(file_path)
+
+
+# Run the server
+if __name__ == "__main__":
+    mcp.run()
