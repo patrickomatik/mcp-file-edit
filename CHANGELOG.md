@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2025-06-30
+
+### Changed
+- Refactored `ssh_sync` to use rsync for efficient file synchronization
+- Added `update_only` parameter (default: True) to only update files if source is newer
+- Added `show_progress` parameter (default: True) to display rsync progress output
+- Improved performance for large directory synchronizations through rsync compression
+
+### Added  
+- Real-time progress tracking during sync operations
+- Support for exclude patterns in sync operations
+- Detailed rsync command output in sync results
+
 ## [1.3.0] - 2025-06-30
 
 ### Added

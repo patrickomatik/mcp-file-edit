@@ -108,23 +108,31 @@ async def test_ssh_transfers():
         # Modify a local file
         (local_dir / "test1.txt").write_text("Modified test file 1")
         
-        # Sync upload
+        # Sync upload with rsync
         result = await ssh_sync(
             local_path=str(local_dir),
             remote_path="synced_dir",
-            direction="upload"
+            direction="upload",
+            update_only=True,
+            show_progress=True
         )
         print(f"Sync upload result: {result}")
+        assert result['success'], f"Sync upload failed: {result.get('error', 'Unknown error')}"
         
-        # Test sync download
+        # Test sync download with exclusions
         sync_download_dir = Path(LOCAL_BASE + "_sync")
         sync_download_dir.mkdir(exist_ok=True)
         
         result = await ssh_sync(
             local_path=str(sync_download_dir),
             remote_path="synced_dir",
-            direction="download"
+            direction="download",
+            exclude_patterns=["*.tmp", "*.log"],
+            update_only=True,
+            show_progress=False  # Quiet mode
         )
+        print(f"Sync download result: {result}")
+        assert result['success'], f"Sync download failed: {result.get('error', 'Unknown error')}"
         print(f"Sync download result: {result}")
         
         print("\n✅ All tests completed successfully!")

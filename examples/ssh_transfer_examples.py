@@ -72,24 +72,27 @@ async def ssh_transfer_examples():
     )
     print(f"Downloaded {result['downloaded']} files, total: {result['total_size']} bytes")
     
-    # Example 5: Sync directories (upload direction)
-    print("\n5. Syncing local to remote...")
+    # Example 5: Sync directories with rsync (upload direction)
+    print("\n5. Syncing local to remote using rsync...")
     result = await ssh_sync(
         local_path="/local/website",
         remote_path="/var/www/html",
-        direction="upload"
+        direction="upload",
+        update_only=True,
+        show_progress=True
     )
-    print(f"Sync completed: {result['uploaded']} files uploaded")
+    print(f"Sync completed: {result.get('files_transferred', 0)} files transferred")
     
-    # Example 6: Sync directories (download direction)
-    print("\n6. Syncing remote to local...")
+    # Example 6: Sync directories with rsync (download direction)
+    print("\n6. Syncing remote to local using rsync...")
     result = await ssh_sync(
         local_path="/local/database_backups",
         remote_path="/remote/db_dumps",
-        direction="download"
+        direction="download",
+        update_only=True,
+        show_progress=True
     )
-    print(f"Sync completed: {result['downloaded']} files downloaded")
-    
+    print(f"Sync completed: {result.get('files_transferred', 0)} files transferred")
     # Example 7: Upload with error handling
     print("\n7. Upload with comprehensive error handling...")
     try:
@@ -139,7 +142,37 @@ async def advanced_ssh_example():
         "ssh://deploy@staging.example.com/var/app",
         connection_type="ssh"
     )
+    )
     
+    # Example 8: Advanced rsync sync with exclusions and delete
+    print("\n8. Advanced rsync sync with exclusions...")
+    result = await ssh_sync(
+        local_path="/local/project",
+        remote_path="/remote/project",
+        direction="upload",
+        delete=True,  # Remove files on remote that don't exist locally
+        exclude_patterns=["*.log", "*.tmp", "node_modules/", ".git/"],
+        update_only=True,  # Only update if source is newer
+        show_progress=True
+    )
+    if result['success']:
+        print(f"Sync successful! Transferred {result['files_transferred']} files")
+        print(f"Total size: {result['total_size']} bytes")
+        print(f"Command used: {result['rsync_command']}")
+    else:
+        print(f"Sync failed: {result['error']}")
+    
+    # Example 9: Sync without updating newer files on destination
+    print("\n9. Sync without overwriting newer destination files...")
+    result = await ssh_sync(
+        local_path="/local/backup",
+        remote_path="/remote/backup",
+        direction="download",
+        update_only=True,  # This ensures newer files at destination are preserved
+        show_progress=False  # Run quietly
+    )
+    print(f"Sync result: {result['success']}")
+
     # Download application logs
     result = await ssh_download(
         remote_path="logs",

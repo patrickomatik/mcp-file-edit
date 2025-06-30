@@ -13,7 +13,7 @@ A simple Model Context Protocol (MCP) server that provides comprehensive file sy
 - 🧬 **Code Analysis**: Extract functions, classes, and structure from code files
 - 🛡️ **Safety**: Built-in path traversal protection and safe operations
 - 💾 **Binary Support**: Handle both text and binary files with proper encoding
-- 🌐 **SSH Support**: Seamlessly work with remote filesystems over SSH
+- 📤 **SSH Transfer**: Upload/download files and efficient rsync synchronization
 - 📤 **SSH Upload/Download**: Transfer files between local and remote filesystems
 - 🔀 **Git Operations**: Full git support for both local and remote repositories
 
@@ -302,20 +302,31 @@ result = ssh_download(
     recursive=True
 )
 
-# Sync directories (simplified rsync-like operation)
+# Sync directories using rsync for efficiency
 result = ssh_sync(
     local_path="/local/source",
     remote_path="/remote/mirror",
-    direction="upload",  # or "download"
-    delete=False  # Don't delete extra files in destination
+    direction="upload",       # or "download"
+    delete=False,             # Don't delete extra files in destination
+    update_only=True,         # Only update if source is newer (default)
+    show_progress=True,       # Show rsync progress output (default)
+    exclude_patterns=[        # Patterns to exclude from sync
+        "*.log",
+        "*.tmp",
+        "node_modules/",
+        ".git/"
+    ]
 )
-```
 
 **Transfer Features:**
+- Efficient rsync-based synchronization with compression
 - Single file or recursive directory transfers
+- Smart updates - only transfer files if source is newer
 - Automatic directory creation
-- Overwrite control
-- Progress tracking with file counts and sizes
+- Overwrite control with update_only option
+- Real-time progress tracking with rsync --progress
+- Exclude patterns for filtering files
+- Delete option for true mirror synchronization
 - Error handling with detailed error reports
 - Supports both absolute and relative paths
 

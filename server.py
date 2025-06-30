@@ -722,10 +722,12 @@ async def ssh_sync(
     remote_path: str,
     direction: str = "upload",
     delete: bool = False,
-    exclude_patterns: Optional[List[str]] = None
+    exclude_patterns: Optional[List[str]] = None,
+    update_only: bool = True,
+    show_progress: bool = True
 ) -> Dict[str, Any]:
     """
-    Synchronize files between local and remote filesystems.
+    Synchronize files between local and remote filesystems using rsync.
     
     Args:
         local_path: Local directory path
@@ -733,6 +735,8 @@ async def ssh_sync(
         direction: Sync direction - "upload" (local to remote) or "download" (remote to local)
         delete: Delete files in destination that don't exist in source
         exclude_patterns: List of glob patterns to exclude from sync
+        update_only: Only replace files if source files are newer (default: True)
+        show_progress: Show rsync progress output (default: True)
         
     Returns:
         Dictionary with sync results
@@ -743,27 +747,156 @@ async def ssh_sync(
     if direction not in ["upload", "download"]:
         raise ValueError("Direction must be 'upload' or 'download'")
     
-    # For now, implement basic sync using upload/download
-    # This is a simplified version - a full sync would compare timestamps and checksums
+    # Get SSH connection details
+    if not SSH_HOST or not SSH_USERNAME:
+        raise ValueError("SSH host and username not configured")
+    
+    # Build rsync command
+    rsync_cmd = ["rsync", "-avz"]  # archive, verbose, compress
+    
+    # Add update flag if requested (only update files if source is newer)
+    if update_only:
+        rsync_cmd.append("-u")
+    
+    # Add progress flag if requested
+    if show_progress:
+        rsync_cmd.append("--progress")
+    
+    # Add delete flag if requested
+    if delete:
+        rsync_cmd.append("--delete")
+    
+    # Add exclude patterns
+    if exclude_patterns:
+        for pattern in exclude_patterns:
+            rsync_cmd.extend(["--exclude", pattern])
+    
+    # Add SSH options
+    ssh_options = f"-p {SSH_PORT}"
+    if SSH_KEY_FILENAME:
+        ssh_options += f" -i {SSH_KEY_FILENAME}"
+    rsync_cmd.extend(["-e", f"ssh {ssh_options}"])
+    
+    # Build source and destination paths
     if direction == "upload":
-        result = await ssh_upload(
-            local_path=local_path,
-            remote_path=remote_path,
-            recursive=True,
-            overwrite=True
-        )
-    else:
-        result = await ssh_download(
-            remote_path=remote_path,
-            local_path=local_path,
-            recursive=True,
-            overwrite=True
-        )
+        # Ensure local path ends with / for directory sync
+        if not local_path.endswith('/'):
+            local_path += '/'
+        source = local_path
+        destination = f"{SSH_USERNAME}@{SSH_HOST}:{remote_path}"
+    else:  # download
+        # Ensure remote path ends with / for directory sync
+        if not remote_path.endswith('/'):
+            remote_path += '/'
+        source = f"{SSH_USERNAME}@{SSH_HOST}:{remote_path}"
+        destination = local_path
     
-    result["direction"] = direction
-    result["sync_completed"] = True
+    rsync_cmd.extend([source, destination])
     
-    return result
+    # Execute rsync command
+    import asyncio
+    import sys
+    
+    try:
+        # Create subprocess
+        process = await asyncio.create_subprocess_exec(
+            *rsync_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        # Collect output with progress indication
+        stdout_data = []
+        stderr_data = []
+        
+        # Read stdout and stderr concurrently
+        async def read_stream(stream, data_list, is_progress=False):
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                decoded_line = line.decode('utf-8', errors='ignore')
+                data_list.append(decoded_line)
+                
+                # Print progress lines to give feedback
+                if show_progress and is_progress:
+                    # Only print lines that contain progress info
+                    if '%' in decoded_line or 'to-check=' in decoded_line:
+                        print(f"\rProgress: {decoded_line.strip()}", end='', file=sys.stderr)
+        
+        # Start reading both streams
+        await asyncio.gather(
+            read_stream(process.stdout, stdout_data, is_progress=True),
+            read_stream(process.stderr, stderr_data)
+        )
+        
+        # Wait for process to complete
+        returncode = await process.wait()
+        
+        # Clear progress line
+        if show_progress:
+            print("\r" + " " * 80 + "\r", end='', file=sys.stderr)
+        
+        stdout = ''.join(stdout_data)
+        stderr = ''.join(stderr_data)
+        
+        if returncode != 0:
+            raise RuntimeError(f"rsync failed with return code {returncode}: {stderr}")
+        
+        # Parse rsync output to get statistics
+        files_transferred = 0
+        total_size = 0
+        
+        # Look for summary statistics in output
+        for line in stdout_data:
+            # Match lines like "Number of files transferred: X"
+            if "Number of files transferred:" in line:
+                try:
+                    files_transferred = int(line.split(':')[-1].strip())
+                except:
+                    pass
+            # Match lines like "Total transferred file size: X bytes"
+            elif "Total transferred file size:" in line:
+                try:
+                    size_str = line.split(':')[-1].strip()
+                    # Remove "bytes" and convert
+                    total_size = int(size_str.replace('bytes', '').replace(',', '').strip())
+                except:
+                    pass
+        
+        # Also parse file list from verbose output
+        transferred_files = []
+        for line in stdout_data:
+            # rsync verbose output shows transferred files
+            # Skip directory entries and summary lines
+            if line.strip() and not line.startswith('sending') and not line.startswith('sent') \
+               and not line.startswith('total') and not line.endswith('/'):
+                # Clean up the line
+                file_path = line.strip()
+                if file_path and not any(skip in file_path for skip in ['Number of', 'Total', 'building']):
+                    transferred_files.append(file_path)
+        
+        return {
+            "success": True,
+            "direction": direction,
+            "source": source,
+            "destination": destination,
+            "files_transferred": files_transferred,
+            "total_size": total_size,
+            "transferred_files": transferred_files[:100],  # Limit to first 100 files
+            "rsync_command": ' '.join(rsync_cmd),
+            "stdout": stdout[-1000:] if len(stdout) > 1000 else stdout,  # Last 1000 chars
+            "stderr": stderr
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "direction": direction,
+            "error": str(e),
+            "rsync_command": ' '.join(rsync_cmd)
+        }
+
 
 
 # Git Operations Tools
@@ -2416,53 +2549,6 @@ async def ssh_download(
 
 
 @mcp.tool()
-async def ssh_sync(
-    local_path: str,
-    remote_path: str,
-    direction: str = "upload",
-    delete: bool = False,
-    exclude_patterns: Optional[List[str]] = None
-) -> Dict[str, Any]:
-    """
-    Synchronize files between local and remote filesystems.
-    
-    Args:
-        local_path: Local directory path
-        remote_path: Remote directory path (on SSH server)
-        direction: Sync direction - "upload" (local to remote) or "download" (remote to local)
-        delete: Delete files in destination that don't exist in source
-        exclude_patterns: List of glob patterns to exclude from sync
-        
-    Returns:
-        Dictionary with sync results
-    """
-    if CONNECTION_TYPE != "ssh":
-        raise ValueError("SSH connection not established. Use set_project_directory with connection_type='ssh' first")
-    
-    if direction not in ["upload", "download"]:
-        raise ValueError("Direction must be 'upload' or 'download'")
-    
-    # For now, implement basic sync using upload/download
-    # This is a simplified version - a full sync would compare timestamps and checksums
-    if direction == "upload":
-        result = await ssh_upload(
-            local_path=local_path,
-            remote_path=remote_path,
-            recursive=True,
-            overwrite=True
-        )
-    else:
-        result = await ssh_download(
-            remote_path=remote_path,
-            local_path=local_path,
-            recursive=True,
-            overwrite=True
-        )
-    
-    result["direction"] = direction
-    result["sync_completed"] = True
-    
-    return result
 
 
 # Git Operations Tools
