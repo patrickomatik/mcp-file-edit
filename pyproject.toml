@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-file-edit"
-version = "1.0.1"
+version = "1.1.0"
 description = "A powerful MCP server for comprehensive file system operations"
 readme = "README.md"
 requires-python = ">=3.10"

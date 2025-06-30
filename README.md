@@ -11,7 +11,9 @@ A simple Model Context Protocol (MCP) server that provides comprehensive file sy
 - 🔧 **Patch**: Apply precise modifications using line, pattern, or context-based patches
 - 📍 **Project Directory**: Set a working directory for simplified relative paths
 - 🧬 **Code Analysis**: Extract functions, classes, and structure from code files
-- 🛡️ **Safety**: Built-in path traversal protection and safe operations- 💾 **Binary Support**: Handle both text and binary files with proper encoding
+- 🛡️ **Safety**: Built-in path traversal protection and safe operations
+- 💾 **Binary Support**: Handle both text and binary files with proper encoding
+- 🌐 **SSH Support**: Seamlessly work with remote filesystems over SSH
 
 ## Installation
 
@@ -245,6 +247,40 @@ results = search_functions("test_.*", "tests/", "*.py")
 - **Backup Creation**: Automatic backups before modifications (configurable)
 - **Dry Run Mode**: Preview changes before applying them
 - **Atomic Operations**: All-or-nothing patch applications
+
+### SSH Support
+
+The file editor now supports SSH connections for remote filesystem operations:
+
+```python
+# Connect to a remote server using SSH URL format
+set_project_directory("ssh://user@example.com:22/home/user/project")
+
+# Or specify SSH parameters explicitly
+set_project_directory(
+    path="/home/user/project",
+    connection_type="ssh",
+    ssh_host="example.com",
+    ssh_username="user",
+    ssh_port=22,
+    ssh_key_filename="~/.ssh/id_rsa"  # Optional, defaults to ~/.ssh/id_rsa
+)
+
+# All file operations now work on the remote server
+files = list_files("src")  # Lists files on remote server
+content = read_file("config.json")  # Reads from remote server
+write_file("output.txt", "Remote content")  # Writes to remote server
+
+# Switch back to local filesystem
+set_project_directory("/local/path", connection_type="local")
+```
+
+**SSH Features:**
+- Key-based authentication (no password prompts)
+- All file operations work transparently over SSH
+- No tools required on the remote server
+- Efficient operations using SFTP protocol
+- Automatic reconnection on connection loss
 
 ## Examples
 See the `examples/` directory for detailed usage examples:
