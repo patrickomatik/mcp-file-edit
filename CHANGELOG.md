@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-06-30
+
+### Added
+- SSH file transfer operations:
+  - `ssh_upload`: Upload files from local to remote filesystem
+  - `ssh_download`: Download files from remote to local filesystem  
+  - `ssh_sync`: Synchronize directories between local and remote
+  - Support for single file and recursive directory transfers
+  - Automatic directory creation and overwrite control
+  - Progress tracking with file counts and total size
+  - Detailed error reporting for failed transfers
+
 ## [1.1.0] - 2025-06-30
 
 ### Added

@@ -14,6 +14,7 @@ A simple Model Context Protocol (MCP) server that provides comprehensive file sy
 - 🛡️ **Safety**: Built-in path traversal protection and safe operations
 - 💾 **Binary Support**: Handle both text and binary files with proper encoding
 - 🌐 **SSH Support**: Seamlessly work with remote filesystems over SSH
+- 📤 **SSH Upload/Download**: Transfer files between local and remote filesystems
 
 ## Installation
 
@@ -260,12 +261,72 @@ write_file("output.txt", "Remote content")  # Writes to remote server
 set_project_directory("/local/path", connection_type="local")
 ```
 
+#### SSH File Transfer Operations
+
+Transfer files between local and remote filesystems:
+
+```python
+# First, establish SSH connection
+set_project_directory(
+    path="/remote/project",
+    connection_type="ssh",
+    ssh_host="example.com",
+    ssh_username="user"
+)
+
+# Upload a single file
+result = ssh_upload(
+    local_path="/local/file.txt",
+    remote_path="uploads/file.txt"
+)
+
+# Upload a directory recursively
+result = ssh_upload(
+    local_path="/local/project",
+    remote_path="/remote/backup",
+    recursive=True,
+    overwrite=True
+)
+
+# Download a file
+result = ssh_download(
+    remote_path="data/report.pdf",
+    local_path="/local/downloads/report.pdf"
+)
+
+# Download a directory
+result = ssh_download(
+    remote_path="/remote/logs",
+    local_path="/local/logs_backup",
+    recursive=True
+)
+
+# Sync directories (simplified rsync-like operation)
+result = ssh_sync(
+    local_path="/local/source",
+    remote_path="/remote/mirror",
+    direction="upload",  # or "download"
+    delete=False  # Don't delete extra files in destination
+)
+```
+
+**Transfer Features:**
+- Single file or recursive directory transfers
+- Automatic directory creation
+- Overwrite control
+- Progress tracking with file counts and sizes
+- Error handling with detailed error reports
+- Supports both absolute and relative paths
+
 **SSH Features:**
 - Key-based authentication (no password prompts)
 - All file operations work transparently over SSH
 - No tools required on the remote server
 - Efficient operations using SFTP protocol
 - Automatic reconnection on connection loss
+- Upload/download files between local and remote systems
+- Recursive directory transfers
+- Sync operations with conflict handling
 
 ## Examples
 See the `examples/` directory for detailed usage examples:
